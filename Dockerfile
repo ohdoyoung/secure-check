@@ -10,6 +10,7 @@ FROM eclipse-temurin:17-jre
 WORKDIR /app
 RUN addgroup --system app && adduser --system --ingroup app app
 COPY --from=build /workspace/target/*.jar /app/app.jar
+COPY backend/rules /app/rules
 USER app
 
 EXPOSE 8080
