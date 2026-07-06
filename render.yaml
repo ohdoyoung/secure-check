@@ -1,0 +1,13 @@
+services:
+  - type: web
+    name: chwiyakhaenne-api
+    runtime: docker
+    plan: free
+    region: singapore
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    healthCheckPath: /api/health
+    autoDeployTrigger: commit
+    envVars:
+      - key: CHWIYAKHAENNE_CORS_ALLOWED_ORIGINS
+        sync: false

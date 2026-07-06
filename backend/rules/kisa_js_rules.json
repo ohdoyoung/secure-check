@@ -1,0 +1,978 @@
+[
+  {
+    "id": "JS-KISA-001",
+    "title": "SQL 삽입",
+    "category": "입력데이터 검증 및 표현",
+    "severity": "HIGH",
+    "cwe": "CWE-89",
+    "detectionType": "AST + Regex",
+    "description": "검증되지 않은 외부 입력값이 동적 SQL 문자열에 결합되어 데이터베이스 질의로 실행되는 패턴을 탐지한다.",
+    "detectPatterns": [
+      "(?is)\\b(?:connection|db|client|pool)\\.(?:query|execute|raw)\\s*\\([^)]*(?:\\+|\\$\\{)"
+    ],
+    "safePatterns": [
+      "(?is)\\b(?:query|execute)\\s*\\(\\s*[\"'][^\"']*\\?[^\"']*[\"']\\s*,\\s*\\[",
+      "(?is)\\b(?:where|data)\\s*:\\s*\\{",
+      "(?is)\\b(?:prisma|sequelize)\\."
+    ],
+    "astSignals": ["call:query", "call:execute", "call:raw"],
+    "recommendation": "SQL 문자열 결합을 중단하고 파라미터 바인딩, Prepared Statement, ORM 조건 객체를 사용한다.",
+    "kisaReference": "JavaScript 시큐어코딩 가이드 2023",
+    "kisaItem": "제1절 입력데이터 검증 및 표현 > SQL 삽입"
+  },
+  {
+    "id": "JS-KISA-002",
+    "title": "코드 삽입",
+    "category": "입력데이터 검증 및 표현",
+    "severity": "HIGH",
+    "cwe": "CWE-94",
+    "detectionType": "AST + Regex",
+    "description": "외부 입력값을 eval, Function, vm 실행 계열 API로 전달해 임의 코드가 실행될 수 있는 패턴을 탐지한다.",
+    "detectPatterns": [
+      "(?is)\\b(?:eval|Function|setImmediate)\\s*\\(\\s*(?:req\\.|request\\.|ctx\\.|location\\.|window\\.|document\\.|[A-Za-z_$][\\w$]*(?:Code|Script|Expression))",
+      "(?is)\\bvm\\.(?:runInThisContext|runInNewContext|runInContext)\\s*\\(\\s*(?:req\\.|[A-Za-z_$][\\w$]*(?:Code|Script|Expression))"
+    ],
+    "safePatterns": [
+      "(?is)\\bJSON\\.parse\\s*\\(",
+      "(?is)\\b(?:zod|joi|yup)\\.",
+      "(?is)\\bswitch\\s*\\("
+    ],
+    "astSignals": ["call:eval", "call:Function", "call:runInThisContext", "call:runInNewContext", "call:runInContext"],
+    "recommendation": "동적 코드 실행 API 사용을 제거하고 허용 목록 기반 분기, 파서, DSL 검증 로직으로 대체한다.",
+    "kisaReference": "JavaScript 시큐어코딩 가이드 2023",
+    "kisaItem": "제1절 입력데이터 검증 및 표현 > 코드 삽입"
+  },
+  {
+    "id": "JS-KISA-003",
+    "title": "경로 조작 및 자원 삽입",
+    "category": "입력데이터 검증 및 표현",
+    "severity": "HIGH",
+    "cwe": "CWE-22",
+    "detectionType": "AST + Regex",
+    "description": "외부 입력값이 파일 경로 또는 자원 경로 생성에 직접 사용되는 패턴을 탐지한다.",
+    "detectPatterns": [
+      "(?is)\\b(?:fs\\.)?(?:readFile|readFileSync|createReadStream|writeFile|unlink)\\s*\\(\\s*(?:req\\.|path\\.join\\([^)]*req\\.|[A-Za-z_$][\\w$]*(?:Path|File|Filename|Name))",
+      "(?is)\\b(?:res\\.)?(?:sendFile|download)\\s*\\(\\s*(?:req\\.|path\\.join\\([^)]*req\\.)"
+    ],
+    "safePatterns": [
+      "(?is)\\bpath\\.resolve\\s*\\(",
+      "(?is)\\bstartsWith\\s*\\(\\s*BASE_DIR",
+      "(?is)\\b(?:sanitizeFilename|basename)\\s*\\("
+    ],
+    "astSignals": ["call:readFile", "call:readFileSync", "call:createReadStream", "call:sendFile", "call:download"],
+    "recommendation": "사용자 입력 파일명은 정규화 후 기준 디렉터리 하위인지 검증하고, 허용 목록 파일명만 접근한다.",
+    "kisaReference": "JavaScript 시큐어코딩 가이드 2023",
+    "kisaItem": "제1절 입력데이터 검증 및 표현 > 경로 조작 및 자원 삽입"
+  },
+  {
+    "id": "JS-KISA-004",
+    "title": "크로스사이트 스크립트(XSS)",
+    "category": "입력데이터 검증 및 표현",
+    "severity": "HIGH",
+    "cwe": "CWE-79",
+    "detectionType": "AST + Regex",
+    "description": "검증되지 않은 외부 입력값이 HTML 응답 또는 DOM 삽입 API에 그대로 전달되는 패턴을 탐지한다.",
+    "detectPatterns": [
+      "(?is)\\b(?:res|response)\\.(?:send|write|end)\\s*\\([^)]*(?:req\\.|request\\.|ctx\\.|query|body|params|cookies)",
+      "(?is)\\.innerHTML\\s*=\\s*(?:req\\.|location\\.|document\\.|[A-Za-z_$][\\w$]*(?:Html|Input|Comment|Message))"
+    ],
+    "safePatterns": [
+      "(?is)\\b(?:escapeHtml|sanitize|DOMPurify\\.sanitize)\\s*\\(",
+      "(?is)\\.textContent\\s*="
+    ],
+    "astSignals": ["call:send", "call:write", "call:end", "member:innerHTML"],
+    "recommendation": "HTML 컨텍스트에 맞게 출력 인코딩을 적용하고, DOM 삽입 시 textContent 또는 검증된 sanitizer를 사용한다.",
+    "kisaReference": "JavaScript 시큐어코딩 가이드 2023",
+    "kisaItem": "제1절 입력데이터 검증 및 표현 > 크로스사이트 스크립트(XSS)"
+  },
+  {
+    "id": "JS-KISA-005",
+    "title": "운영체제 명령어 삽입",
+    "category": "입력데이터 검증 및 표현",
+    "severity": "HIGH",
+    "cwe": "CWE-78",
+    "detectionType": "AST + Regex",
+    "description": "외부 입력값이 child_process 명령 문자열 또는 shell 실행 옵션으로 전달되는 패턴을 탐지한다.",
+    "detectPatterns": [
+      "(?is)\\b(?:exec|execSync)\\s*\\([^)]*(?:req\\.|request\\.|ctx\\.|query|body|params|\\+)",
+      "(?is)\\bspawn\\s*\\([^)]*\\{[^}]*shell\\s*:\\s*true"
+    ],
+    "safePatterns": [
+      "(?is)\\bexecFile\\s*\\(",
+      "(?is)\\bspawn\\s*\\(\\s*[\"'][^\"']+[\"']\\s*,\\s*\\[",
+      "(?is)\\ballowedCommands\\b"
+    ],
+    "astSignals": ["call:exec", "call:execSync", "call:spawn"],
+    "recommendation": "쉘 문자열 실행을 피하고 execFile/spawn 인자 배열과 허용 목록 검증을 사용한다.",
+    "kisaReference": "JavaScript 시큐어코딩 가이드 2023",
+    "kisaItem": "제1절 입력데이터 검증 및 표현 > 운영체제 명령어 삽입"
+  },
+  {
+    "id": "JS-KISA-006",
+    "title": "위험한 형식 파일 업로드",
+    "category": "입력데이터 검증 및 표현",
+    "severity": "MEDIUM",
+    "cwe": "CWE-434",
+    "detectionType": "AST + Regex",
+    "description": "업로드 파일의 MIME, 확장자, 크기 검증 없이 multer 또는 원본 파일명을 사용하는 패턴을 탐지한다.",
+    "detectPatterns": [
+      "(?is)\\bmulter\\s*\\(\\s*\\{(?![^)]*fileFilter)(?![^)]*limits)",
+      "(?is)\\b(?:file|req\\.file)\\.originalname\\b[^;]*(?:path\\.join|writeFile|rename)"
+    ],
+    "safePatterns": [
+      "(?is)\\bfileFilter\\s*:",
+      "(?is)\\blimits\\s*:",
+      "(?is)\\ballowedMimeTypes\\b|\\ballowedExtensions\\b"
+    ],
+    "astSignals": ["call:multer", "member:originalname"],
+    "recommendation": "업로드 파일은 확장자와 MIME 허용 목록, 크기 제한, 저장명 재생성, 실행 권한 제거를 함께 적용한다.",
+    "kisaReference": "JavaScript 시큐어코딩 가이드 2023",
+    "kisaItem": "제1절 입력데이터 검증 및 표현 > 위험한 형식 파일 업로드"
+  },
+  {
+    "id": "JS-KISA-007",
+    "title": "서버사이드 요청 위조(SSRF)",
+    "category": "입력데이터 검증 및 표현",
+    "severity": "HIGH",
+    "cwe": "CWE-918",
+    "detectionType": "AST + Regex",
+    "description": "외부 입력 URL을 서버 측 HTTP 클라이언트가 직접 호출하는 패턴을 탐지한다.",
+    "detectPatterns": [
+      "(?is)\\b(?:axios\\.get|axios\\.post|fetch|http\\.get|https\\.get|request)\\s*\\(\\s*(?:req\\.|request\\.|ctx\\.|(?:url|uri|endpoint|targetUrl|requestUrl|[A-Za-z_$][\\w$]*(?:url|uri|endpoint))(?:\\.toString\\s*\\(\\s*\\))?)"
+    ],
+    "safePatterns": [
+      "(?is)\\ballowedHosts\\b|\\bALLOWED_HOSTS\\b",
+      "(?is)\\bnew\\s+URL\\s*\\(",
+      "(?is)\\b(?:isPrivateIp|isLoopback|validateOutboundUrl)\\s*\\("
+    ],
+    "astSignals": ["call:get", "call:post", "call:fetch", "call:request"],
+    "recommendation": "외부 요청 대상은 scheme, host, port, 사설 IP 여부를 검증하고 허용 목록 기반으로 제한한다.",
+    "kisaReference": "JavaScript 시큐어코딩 가이드 2023",
+    "kisaItem": "제1절 입력데이터 검증 및 표현 > 서버사이드 요청 위조"
+  },
+  {
+    "id": "JS-KISA-008",
+    "title": "하드코드된 중요정보",
+    "category": "보안기능",
+    "severity": "HIGH",
+    "cwe": "CWE-798",
+    "detectionType": "AST + Regex",
+    "description": "비밀번호, 토큰, API 키, 비밀키로 추정되는 값이 소스코드 문자열로 직접 선언되는 패턴을 탐지한다.",
+    "detectPatterns": [
+      "(?is)\\b(?:password|passwd|pwd|secret|apiKey|api_key|accessToken|refreshToken|privateKey|jwtSecret)\\b\\s*[:=]\\s*[\"'][^\"'\\n]{6,}[\"']"
+    ],
+    "safePatterns": [
+      "(?is)\\bprocess\\.env\\.",
+      "(?is)\\b(?:vault|secretManager|kms)\\.",
+      "(?is)\\bgetSecret\\s*\\("
+    ],
+    "astSignals": [],
+    "recommendation": "중요정보는 환경 변수, KMS, Secret Manager, Vault 등 외부 비밀 저장소에서 주입한다.",
+    "kisaReference": "JavaScript 시큐어코딩 가이드 2023",
+    "kisaItem": "제2절 보안기능 > 하드코드된 중요정보"
+  },
+  {
+    "id": "JS-KISA-009",
+    "title": "취약한 암호화 알고리즘 사용",
+    "category": "보안기능",
+    "severity": "MEDIUM",
+    "cwe": "CWE-327",
+    "detectionType": "AST + Regex",
+    "description": "MD5, SHA-1, DES, RC4처럼 더 이상 안전하지 않은 해시 또는 암호 알고리즘 사용을 탐지한다.",
+    "detectPatterns": [
+      "(?is)\\bcrypto\\.createHash\\s*\\(\\s*[\"'](?:md5|sha1)[\"']",
+      "(?is)\\bcrypto\\.createCipher(?:iv)?\\s*\\(\\s*[\"'](?:des|des-ede|rc4|bf|blowfish)[^\"']*[\"']"
+    ],
+    "safePatterns": [
+      "(?is)\\b(?:pbkdf2|scrypt|argon2)\\b"
+    ],
+    "astSignals": ["call:createHash", "call:createCipher", "call:createCipheriv"],
+    "recommendation": "해시는 SHA-256 이상 또는 비밀번호 전용 KDF를, 대칭키 암호는 AEAD 모드 알고리즘을 사용한다.",
+    "kisaReference": "JavaScript 시큐어코딩 가이드 2023",
+    "kisaItem": "제2절 보안기능 > 취약한 암호화 알고리즘 사용"
+  },
+  {
+    "id": "JS-KISA-010",
+    "title": "오류 메시지 정보노출",
+    "category": "에러처리",
+    "severity": "MEDIUM",
+    "cwe": "CWE-209",
+    "detectionType": "AST + Regex",
+    "description": "예외 객체의 stack, message, name 등을 HTTP 응답으로 그대로 노출하는 패턴을 탐지한다.",
+    "detectPatterns": [
+      "(?is)\\b(?:res|response)\\.status\\s*\\([^)]*\\)\\s*\\.(?:send|json)\\s*\\([^)]*(?:err|error)\\.(?:stack|message|name)",
+      "(?is)\\b(?:res|response)\\.(?:send|json)\\s*\\(\\s*(?:err|error)\\.(?:stack|message|name)"
+    ],
+    "safePatterns": [
+      "(?is)\\b(?:logger|log)\\.error\\s*\\(",
+      "(?is)\\bmessage\\s*:\\s*[\"']Internal Server Error[\"']",
+      "(?is)\\bNODE_ENV\\s*={0,2}\\s*[\"']production[\"']"
+    ],
+    "astSignals": ["call:send", "call:json"],
+    "recommendation": "클라이언트에는 일반화된 오류 메시지만 반환하고 상세 오류는 서버 로그에만 기록한다.",
+    "kisaReference": "JavaScript 시큐어코딩 가이드 2023",
+    "kisaItem": "제4절 에러처리 > 오류 메시지 정보노출"
+  },
+  {
+    "id": "JS-KISA-011",
+    "title": "Null Pointer 역참조",
+    "category": "코드오류",
+    "severity": "LOW",
+    "cwe": "CWE-476",
+    "detectionType": "AST + Regex",
+    "description": "외부 입력에서 가져온 객체를 null/undefined 검증 없이 연쇄 속성 접근하는 패턴을 탐지한다.",
+    "detectPatterns": [
+      "(?is)\\b(?:const|let|var)\\s+([A-Za-z_$][\\w$]*)\\s*=\\s*(?:req|request|ctx)\\.[^;]+;[\\s\\S]{0,240}\\b\\1\\.[A-Za-z_$][\\w$]*\\.[A-Za-z_$][\\w$]*"
+    ],
+    "safePatterns": [
+      "(?is)\\?\\.",
+      "(?is)\\bif\\s*\\(\\s*!\\s*[A-Za-z_$][\\w$]*",
+      "(?is)\\b(?:zod|joi|yup)\\."
+    ],
+    "astSignals": [],
+    "recommendation": "외부 입력 객체는 스키마 검증, 명시적 null guard, optional chaining을 사용한 뒤 접근한다.",
+    "kisaReference": "JavaScript 시큐어코딩 가이드 2023",
+    "kisaItem": "제5절 코드오류 > Null Pointer 역참조"
+  },
+  {
+    "id": "JS-KISA-012",
+    "title": "제거되지 않은 디버그 코드",
+    "category": "캡슐화",
+    "severity": "LOW",
+    "cwe": "CWE-489",
+    "detectionType": "AST + Regex",
+    "description": "운영 코드에 남은 debugger 문 또는 console 기반 디버그 출력 패턴을 탐지한다.",
+    "detectPatterns": [
+      "(?is)\\bdebugger\\s*;",
+      "(?is)\\bconsole\\.(?:log|debug|trace)\\s*\\("
+    ],
+    "safePatterns": [
+      "(?is)\\b(?:logger|auditLogger)\\.(?:debug|info|warn|error)\\s*\\("
+    ],
+    "astSignals": ["keyword:debugger", "call:log", "call:debug", "call:trace"],
+    "recommendation": "debugger와 console 출력은 제거하고 환경별 레벨 제어가 가능한 로거로 대체한다.",
+    "kisaReference": "JavaScript 시큐어코딩 가이드 2023",
+    "kisaItem": "제6절 캡슐화 > 제거되지 않고 남은 디버그 코드"
+  },
+  {
+    "id": "JS-KISA-013",
+    "title": "취약한 API 사용",
+    "category": "API 오용",
+    "severity": "MEDIUM",
+    "cwe": "CWE-676",
+    "detectionType": "AST + Regex",
+    "description": "document.write, 문자열 기반 timer, 브라우저 저장소에 토큰 저장처럼 보안상 취약한 API 사용을 탐지한다.",
+    "detectPatterns": [
+      "(?is)\\bdocument\\.write\\s*\\(",
+      "(?is)\\b(?:setTimeout|setInterval)\\s*\\(\\s*(?:[\"'`]|req\\.|location\\.)",
+      "(?is)\\blocalStorage\\.setItem\\s*\\(\\s*[\"'](?:token|jwt|password|secret)[\"']"
+    ],
+    "safePatterns": [
+      "(?is)\\.textContent\\s*=",
+      "(?is)\\bsetTimeout\\s*\\(\\s*\\(\\)\\s*=>",
+      "(?is)\\bhttpOnly\\s*:\\s*true"
+    ],
+    "astSignals": ["call:write", "call:setTimeout", "call:setInterval", "call:setItem"],
+    "recommendation": "취약 API 사용을 중단하고 안전한 DOM API, 함수 참조 timer, httpOnly secure cookie 등으로 대체한다.",
+    "kisaReference": "JavaScript 시큐어코딩 가이드 2023",
+    "kisaItem": "제7절 API 오용 > 취약한 API 사용"
+  },
+  {
+    "id": "JS-KISA-014",
+    "title": "DNS lookup에 의존한 보안결정",
+    "category": "API 오용",
+    "severity": "MEDIUM",
+    "cwe": "CWE-350",
+    "detectionType": "AST + Regex",
+    "description": "dns.lookup 결과만으로 접근 허용 여부를 결정하는 패턴을 탐지한다.",
+    "detectPatterns": [
+      "(?is)\\bdns\\.lookup\\s*\\([^)]*=>[\\s\\S]{0,260}\\bif\\s*\\([^)]*(?:address|addr)\\.(?:startsWith|includes|match)\\s*\\(",
+      "(?is)\\bdns\\.lookup\\s*\\([^)]*=>[\\s\\S]{0,260}\\bif\\s*\\([^)]*(?:address|addr)\\s*={2,3}\\s*[\"']"
+    ],
+    "safePatterns": [
+      "(?is)\\bnet\\.isIP\\s*\\(",
+      "(?is)\\b(?:allowedHosts|pinnedIpRanges|validateResolvedIp)\\b"
+    ],
+    "astSignals": ["call:lookup"],
+    "recommendation": "DNS 조회 결과만 신뢰하지 말고 고정된 허용 목록, 재검증, 사설망 차단, 연결 직전 IP 검증을 적용한다.",
+    "kisaReference": "JavaScript 시큐어코딩 가이드 2023",
+    "kisaItem": "제7절 API 오용 > DNS lookup에 의존한 보안결정"
+  },
+  {
+    "id": "JS-KISA-015",
+    "title": "신뢰할 수 없는 데이터의 역직렬화",
+    "category": "코드오류",
+    "severity": "HIGH",
+    "cwe": "CWE-502",
+    "detectionType": "AST + Regex",
+    "description": "외부 입력을 node-serialize, serialize-javascript, yaml.load 등 위험한 역직렬화 API에 전달하는 패턴을 탐지한다.",
+    "detectPatterns": [
+      "(?is)\\b(?:serialize|nodeSerialize|node_serialize)\\.unserialize\\s*\\(\\s*(?:req\\.|request\\.|ctx\\.|[A-Za-z_$][\\w$]*)",
+      "(?is)\\byaml\\.load\\s*\\(\\s*(?:req\\.|request\\.|ctx\\.|[A-Za-z_$][\\w$]*)"
+    ],
+    "safePatterns": [
+      "(?is)\\bJSON\\.parse\\s*\\(",
+      "(?is)\\b(?:schema|validate|safeParse)\\s*\\(",
+      "(?is)\\byaml\\.FAILSAFE_SCHEMA\\b"
+    ],
+    "astSignals": ["call:unserialize", "call:load"],
+    "recommendation": "신뢰할 수 없는 데이터는 안전한 포맷으로 파싱하고 스키마 검증, 무결성 검증, 타입 허용 목록을 적용한다.",
+    "kisaReference": "JavaScript 시큐어코딩 가이드 2023",
+    "kisaItem": "제5절 코드오류 > 신뢰할 수 없는 데이터의 역직렬화"
+  },
+  {
+    "id": "JS-OWASP-001",
+    "title": "Prototype Pollution",
+    "category": "OWASP JavaScript 추가 룰",
+    "severity": "HIGH",
+    "cwe": "CWE-1321",
+    "detectionType": "AST + Regex",
+    "description": "외부 입력 키가 __proto__, constructor, prototype 같은 프로토타입 체인 속성에 쓰일 수 있는 패턴을 탐지한다.",
+    "detectPatterns": [
+      "(?is)\\b(?:merge|extend|defaultsDeep)\\s*\\([^)]*(?:req\\.|body|query|params)",
+      "(?is)\\[[^\\]]*(?:req\\.|body|query|params|key)[^\\]]*\\]\\s*="
+    ],
+    "safePatterns": [
+      "(?is)\\bObject\\.create\\s*\\(\\s*null\\s*\\)",
+      "(?is)\\b(?:blockedKeys|denylist|safeKeys)\\b",
+      "(?is)__proto__\\s*:\\s*null"
+    ],
+    "astSignals": ["call:merge", "call:extend", "call:defaultsDeep"],
+    "recommendation": "사용자 입력 key는 __proto__/constructor/prototype을 차단하고 Object.create(null), Map, 스키마 검증을 사용한다.",
+    "kisaReference": "OWASP Prototype Pollution Prevention Cheat Sheet",
+    "kisaItem": "OWASP JavaScript 추가 룰 > Prototype Pollution"
+  },
+  {
+    "id": "JS-OWASP-002",
+    "title": "정규식 서비스 거부(ReDoS)",
+    "category": "OWASP JavaScript 추가 룰",
+    "severity": "MEDIUM",
+    "cwe": "CWE-1333",
+    "detectionType": "AST + Regex",
+    "description": "중첩 반복 또는 겹치는 대안이 있는 Evil Regex가 외부 입력에 적용되는 패턴을 탐지한다.",
+    "detectPatterns": [
+      "(?is)new\\s+RegExp\\s*\\(\\s*[\"'][^\"']*\\([^)]*[+*][^)]*\\)[+*][^\"']*[\"']\\s*\\)[\\s\\S]{0,160}\\.test\\s*\\([^)]*(?:req\\.|body|query|params|input)",
+      "(?is)/[^/]*\\([^)]*[+*][^)]*\\)[+*][^/]*/\\.test\\s*\\([^)]*(?:req\\.|body|query|params|input)"
+    ],
+    "safePatterns": [
+      "(?is)\\bre2\\b|\\bRE2\\b",
+      "(?is)\\bmaxLength\\b|\\blength\\s*<",
+      "(?is)\\bvalidator\\."
+    ],
+    "astSignals": ["call:RegExp", "call:test"],
+    "recommendation": "중첩 반복 정규식을 단순화하고 입력 길이를 제한하거나 RE2 같은 선형 시간 정규식 엔진을 사용한다.",
+    "kisaReference": "OWASP Regular expression Denial of Service - ReDoS",
+    "kisaItem": "OWASP JavaScript 추가 룰 > ReDoS"
+  },
+  {
+    "id": "JS-OWASP-003",
+    "title": "과도하게 허용된 CORS 정책",
+    "category": "OWASP JavaScript 추가 룰",
+    "severity": "MEDIUM",
+    "cwe": "CWE-942",
+    "detectionType": "AST + Regex",
+    "description": "credentials 허용과 와일드카드 origin이 함께 사용되거나 cors 기본 설정을 전역 적용하는 패턴을 탐지한다.",
+    "detectPatterns": [
+      "(?is)\\bcors\\s*\\(\\s*\\{[^}]*origin\\s*:\\s*[\"']\\*[\"'][^}]*credentials\\s*:\\s*true",
+      "(?is)\\bapp\\.use\\s*\\(\\s*cors\\s*\\(\\s*\\)\\s*\\)"
+    ],
+    "safePatterns": [
+      "(?is)\\ballowedOrigins\\b|\\bALLOWED_ORIGINS\\b",
+      "(?is)\\borigin\\s*:\\s*function\\b",
+      "(?is)\\bcredentials\\s*:\\s*false"
+    ],
+    "astSignals": ["call:cors", "call:use"],
+    "recommendation": "Origin은 환경별 허용 목록으로 제한하고 credentials 사용 여부를 최소화한다.",
+    "kisaReference": "OWASP Node.js Security Cheat Sheet",
+    "kisaItem": "OWASP JavaScript 추가 룰 > Insecure CORS"
+  },
+  {
+    "id": "JS-OWASP-004",
+    "title": "TLS 인증서 검증 비활성화",
+    "category": "OWASP JavaScript 추가 룰",
+    "severity": "HIGH",
+    "cwe": "CWE-295",
+    "detectionType": "AST + Regex",
+    "description": "rejectUnauthorized false 또는 NODE_TLS_REJECT_UNAUTHORIZED=0으로 TLS 인증서 검증을 끄는 패턴을 탐지한다.",
+    "detectPatterns": [
+      "(?is)\\brejectUnauthorized\\s*:\\s*false",
+      "(?is)\\bNODE_TLS_REJECT_UNAUTHORIZED\\b\\s*=\\s*[\"']?0[\"']?"
+    ],
+    "safePatterns": [
+      "(?is)\\brejectUnauthorized\\s*:\\s*true",
+      "(?is)\\bca\\s*:"
+    ],
+    "astSignals": [],
+    "recommendation": "TLS 인증서 검증을 끄지 말고 신뢰 가능한 CA 또는 인증서 핀ning/전용 CA 설정을 사용한다.",
+    "kisaReference": "OWASP Node.js Security Cheat Sheet",
+    "kisaItem": "OWASP JavaScript 추가 룰 > TLS certificate validation"
+  },
+  {
+    "id": "JS-OWASP-005",
+    "title": "CSRF 보호 없는 상태 변경 라우트",
+    "category": "OWASP JavaScript 추가 룰",
+    "severity": "MEDIUM",
+    "cwe": "CWE-352",
+    "detectionType": "AST + Regex",
+    "description": "POST/PUT/PATCH/DELETE 라우트에 CSRF 토큰 검증 미들웨어가 보이지 않는 패턴을 탐지한다.",
+    "detectPatterns": [
+      "(?is)\\b(?:router|app)\\.(?:post|put|patch|delete)\\s*\\(\\s*[\"'][^\"']+[\"']\\s*,\\s*(?![^)]*(?:csrf|csurf|verifyCsrf|sameSite))"
+    ],
+    "safePatterns": [
+      "(?is)\\b(?:csrf\\w*|csurf|verifyCsrf)\\b",
+      "(?is)\\bsameSite\\s*:\\s*[\"'](?:lax|strict)[\"']",
+      "(?is)\\bAuthorization\\b"
+    ],
+    "astSignals": ["call:post", "call:put", "call:patch", "call:delete"],
+    "recommendation": "쿠키 기반 인증의 상태 변경 요청은 CSRF 토큰, SameSite 쿠키, Origin/Referer 검증을 적용한다.",
+    "kisaReference": "OWASP Cross-Site Request Forgery Prevention Cheat Sheet",
+    "kisaItem": "OWASP JavaScript 추가 룰 > CSRF"
+  },
+  {
+    "id": "JS-KISA-016",
+    "title": "신뢰되지 않은 URL주소로 자동접속 연결",
+    "category": "입력데이터 검증 및 표현",
+    "severity": "MEDIUM",
+    "cwe": "CWE-601",
+    "detectionType": "AST + Regex",
+    "description": "외부 입력 URL을 검증 없이 redirect, location 이동, 링크 생성에 사용하는 Open Redirect 패턴을 탐지한다.",
+    "detectPatterns": [
+      "(?is)\\b(?:res|response)\\.redirect\\s*\\(\\s*(?:req\\.|request\\.|ctx\\.|[A-Za-z_$][\\w$]*(?:Url|URL|Redirect|Return|Next|Target))",
+      "(?is)\\b(?:window\\.)?location(?:\\.href)?\\s*=\\s*(?:req\\.|location\\.|[A-Za-z_$][\\w$]*(?:Url|URL|Redirect|Return|Next|Target))"
+    ],
+    "safePatterns": [
+      "(?is)\\ballowedRedirects\\b|\\ballowedReturnUrls\\b|\\bALLOWED_REDIRECTS\\b",
+      "(?is)\\bnew\\s+URL\\s*\\(",
+      "(?is)\\bisLocalPath\\s*\\(|\\bvalidateRedirectUrl\\s*\\("
+    ],
+    "astSignals": [
+      "call:redirect"
+    ],
+    "recommendation": "리다이렉트 대상은 상대경로 또는 허용 목록 도메인만 허용하고, new URL 기반 파싱 후 scheme/host를 검증한다.",
+    "kisaReference": "JavaScript 시큐어코딩 가이드 2023",
+    "kisaItem": "제1절 입력데이터 검증 및 표현 > 신뢰되지 않은 URL주소로 자동접속 연결"
+  },
+  {
+    "id": "JS-KISA-017",
+    "title": "부적절한 XML 외부 개체 참조",
+    "category": "입력데이터 검증 및 표현",
+    "severity": "HIGH",
+    "cwe": "CWE-611",
+    "detectionType": "AST + Regex",
+    "description": "신뢰할 수 없는 XML을 외부 엔티티 해석이 가능한 옵션으로 파싱하는 XXE 위험 패턴을 탐지한다.",
+    "detectPatterns": [
+      "(?is)\\b(?:libxmljs|libxml)\\.(?:parseXml|parseXmlString)\\s*\\([^)]*\\{[^}]*noent\\s*:\\s*true",
+      "(?is)\\b(?:sax|xml2js|xmldom)\\.(?:parseString|parse)\\s*\\(\\s*(?:req\\.|request\\.|ctx\\.)[\\s\\S]{0,160}\\b(?:doctype|externalEntities|resolveExternal)\\s*:\\s*true"
+    ],
+    "safePatterns": [
+      "(?is)\\bnoent\\s*:\\s*false",
+      "(?is)\\bnonet\\s*:\\s*true",
+      "(?is)\\bdisallowDoctype\\s*:\\s*true|\\bdisableExternalEntities\\b"
+    ],
+    "astSignals": [
+      "call:parseXml",
+      "call:parseXmlString",
+      "call:parseString",
+      "call:parse"
+    ],
+    "recommendation": "XML 파서는 DTD와 외부 엔티티 해석을 비활성화하고, 가능한 경우 JSON 등 단순 포맷과 스키마 검증으로 대체한다.",
+    "kisaReference": "JavaScript 시큐어코딩 가이드 2023",
+    "kisaItem": "제1절 입력데이터 검증 및 표현 > 부적절한 XML 외부 개체 참조"
+  },
+  {
+    "id": "JS-KISA-018",
+    "title": "LDAP 삽입",
+    "category": "입력데이터 검증 및 표현",
+    "severity": "HIGH",
+    "cwe": "CWE-90",
+    "detectionType": "AST + Regex",
+    "description": "외부 입력값을 LDAP filter 문자열에 직접 결합해 search/bind에 사용하는 패턴을 탐지한다.",
+    "detectPatterns": [
+      "(?is)\\b(?:ldapClient|client|ldap)\\.search\\s*\\([\\s\\S]{0,240}\\bfilter\\s*:\\s*[\"'`][\\s\\S]{0,160}(?:\\+|\\$\\{)[\\s\\S]{0,120}(?:req\\.|request\\.|ctx\\.|body|query|params)",
+      "(?is)\\bfilter\\s*=\\s*[\"'`][^\"'`]*(?:uid|cn|mail)[^\"'`]*(?:\\+|\\$\\{)[^;]*(?:req\\.|body|query|params)"
+    ],
+    "safePatterns": [
+      "(?is)\\b(?:escapeLDAP|ldapEscape|encodeForLDAP)\\s*\\(",
+      "(?is)\\b(?:zod|joi|yup)\\.",
+      "(?is)\\ballowedLdapAttributes\\b"
+    ],
+    "astSignals": [
+      "call:search"
+    ],
+    "recommendation": "LDAP filter 값은 RFC4515 이스케이프를 적용하고, 검색 속성/필터 형태는 허용 목록으로 제한한다.",
+    "kisaReference": "JavaScript 시큐어코딩 가이드 2023",
+    "kisaItem": "제1절 입력데이터 검증 및 표현 > LDAP 삽입"
+  },
+  {
+    "id": "JS-KISA-019",
+    "title": "보안기능 결정에 사용되는 부적절한 입력값",
+    "category": "입력데이터 검증 및 표현",
+    "severity": "HIGH",
+    "cwe": "CWE-807",
+    "detectionType": "AST + Regex",
+    "description": "권한, 관리자 여부, 결제 승인 같은 보안 결정을 req.body/query/params 값으로 직접 판단하는 패턴을 탐지한다.",
+    "detectPatterns": [
+      "(?is)\\bif\\s*\\([^)]*(?:req|request|ctx)\\.(?:body|query|params)\\.(?:isAdmin|admin|role|permission|paid|verified|approved)",
+      "(?is)\\b(?:isAdmin|role|permission|approved)\\s*=\\s*(?:req|request|ctx)\\.(?:body|query|params)\\."
+    ],
+    "safePatterns": [
+      "(?is)\\breq\\.user\\.",
+      "(?is)\\b(?:requireRole|authorize|policy\\.can|accessControl)\\s*\\(",
+      "(?is)\\bserverSideRole\\b"
+    ],
+    "astSignals": [],
+    "recommendation": "보안 결정은 서버가 검증한 세션/토큰/DB 권한 정보로 수행하고, 클라이언트 입력값은 보안 상태로 신뢰하지 않는다.",
+    "kisaReference": "JavaScript 시큐어코딩 가이드 2023",
+    "kisaItem": "제1절 입력데이터 검증 및 표현 > 보안기능 결정에 사용되는 부적절한 입력값"
+  },
+  {
+    "id": "JS-KISA-020",
+    "title": "적절한 인증 없는 중요 기능 허용",
+    "category": "보안기능",
+    "severity": "HIGH",
+    "cwe": "CWE-306",
+    "detectionType": "AST + Regex",
+    "description": "관리자, 결제, 송금, 삭제 등 중요 기능 라우트에 인증 미들웨어가 보이지 않는 패턴을 탐지한다.",
+    "detectPatterns": [
+      "(?is)\\b(?:router|app)\\.(?:post|put|patch|delete)\\s*\\(\\s*[\"'][^\"']*(?:admin|delete|transfer|payment|withdraw|reset)[^\"']*[\"']\\s*,\\s*(?![^)]*(?:auth|authenticate|requireAuth|requireAdmin|authorize|role|owner|isAuthenticated|passport\\.authenticate))"
+    ],
+    "safePatterns": [],
+    "astSignals": [
+      "call:post",
+      "call:put",
+      "call:patch",
+      "call:delete"
+    ],
+    "recommendation": "중요 기능 라우트에는 인증 미들웨어와 실패 시 명확한 차단 응답을 공통으로 적용한다.",
+    "kisaReference": "JavaScript 시큐어코딩 가이드 2023",
+    "kisaItem": "제2절 보안기능 > 적절한 인증 없는 중요 기능 허용"
+  },
+  {
+    "id": "JS-KISA-021",
+    "title": "부적절한 인가",
+    "category": "보안기능",
+    "severity": "HIGH",
+    "cwe": "CWE-285",
+    "detectionType": "AST + Regex",
+    "description": "사용자 입력 ID로 리소스를 조회한 뒤 소유자/역할/테넌트 검증 없이 응답하는 IDOR 위험 패턴을 탐지한다.",
+    "detectPatterns": [
+      "(?is)\\b(?:findById|findOne|getById)\\s*\\(\\s*(?:req|request|ctx)\\.params\\.[A-Za-z_$][\\w$]*\\s*\\)[\\s\\S]{0,220}\\b(?:res|response)\\.json\\s*\\("
+    ],
+    "safePatterns": [
+      "(?is)\\b(?:ownerId|userId|tenantId)\\s*:",
+      "(?is)\\b(?:authorize|canAccess|policy\\.can|requireOwner)\\s*\\(",
+      "(?is)\\breq\\.user\\."
+    ],
+    "astSignals": [
+      "call:findById",
+      "call:findOne",
+      "call:getById",
+      "call:json"
+    ],
+    "recommendation": "리소스 조회 조건에 소유자/테넌트/역할 조건을 포함하고, 응답 전 인가 정책을 명시적으로 검증한다.",
+    "kisaReference": "JavaScript 시큐어코딩 가이드 2023",
+    "kisaItem": "제2절 보안기능 > 부적절한 인가"
+  },
+  {
+    "id": "JS-KISA-022",
+    "title": "충분하지 않은 키 길이 사용",
+    "category": "보안기능",
+    "severity": "MEDIUM",
+    "cwe": "CWE-326",
+    "detectionType": "AST + Regex",
+    "description": "RSA 1024비트 이하, 짧은 HMAC/암호키처럼 보안 강도가 부족한 키 길이 설정을 탐지한다.",
+    "detectPatterns": [
+      "(?is)\\b(?:generateKeyPairSync|generateKeyPair)\\s*\\(\\s*[\"']rsa[\"'][^)]*modulusLength\\s*:\\s*(?:512|768|1024)",
+      "(?is)\\b(?:secret|signingKey|hmacKey|jwtSecret)\\b\\s*[:=]\\s*[\"'][^\"'\\n]{1,15}[\"']"
+    ],
+    "safePatterns": [
+      "(?is)\\bmodulusLength\\s*:\\s*(?:2048|3072|4096)",
+      "(?is)\\b(?:crypto\\.randomBytes|process\\.env|kms|secretManager)\\b"
+    ],
+    "astSignals": [
+      "call:generateKeyPairSync",
+      "call:generateKeyPair"
+    ],
+    "recommendation": "RSA는 최소 2048비트 이상을 사용하고, HMAC/JWT 비밀키는 충분한 엔트로피를 가진 외부 비밀 저장소 값으로 주입한다.",
+    "kisaReference": "JavaScript 시큐어코딩 가이드 2023",
+    "kisaItem": "제2절 보안기능 > 충분하지 않은 키 길이 사용"
+  },
+  {
+    "id": "JS-KISA-023",
+    "title": "적절하지 않은 난수 값 사용",
+    "category": "보안기능",
+    "severity": "HIGH",
+    "cwe": "CWE-330",
+    "detectionType": "AST + Regex",
+    "description": "토큰, OTP, 비밀번호, 세션 ID 등 보안 용도 값을 Math.random으로 생성하는 패턴을 탐지한다.",
+    "detectPatterns": [
+      "(?is)\\b[A-Za-z_$][\\w$]*(?:token|otp|nonce|session|reset|password)[A-Za-z_$]*\\b\\s*=\\s*Math\\.random\\s*\\(",
+      "(?is)\\bMath\\.random\\s*\\(\\s*\\)[^;]{0,120}\\b(?:token|otp|nonce|session|password)"
+    ],
+    "safePatterns": [
+      "(?is)\\bcrypto\\.randomBytes\\s*\\(",
+      "(?is)\\bcrypto\\.randomUUID\\s*\\(",
+      "(?is)\\bwindow\\.crypto\\.getRandomValues\\s*\\("
+    ],
+    "astSignals": [
+      "call:random"
+    ],
+    "recommendation": "보안 토큰/OTP/세션 ID는 crypto.randomBytes, crypto.randomUUID, Web Crypto API 같은 CSPRNG로 생성한다.",
+    "kisaReference": "JavaScript 시큐어코딩 가이드 2023",
+    "kisaItem": "제2절 보안기능 > 적절하지 않은 난수 값 사용"
+  },
+  {
+    "id": "JS-KISA-024",
+    "title": "부적절한 인증서 유효성 검증",
+    "category": "보안기능",
+    "severity": "HIGH",
+    "cwe": "CWE-295",
+    "detectionType": "AST + Regex",
+    "description": "TLS 인증서 검증을 비활성화하는 rejectUnauthorized false 또는 NODE_TLS_REJECT_UNAUTHORIZED=0 패턴을 탐지한다.",
+    "detectPatterns": [
+      "(?is)\\brejectUnauthorized\\s*:\\s*false",
+      "(?is)\\bNODE_TLS_REJECT_UNAUTHORIZED\\b\\s*=\\s*[\"']?0[\"']?"
+    ],
+    "safePatterns": [
+      "(?is)\\brejectUnauthorized\\s*:\\s*true",
+      "(?is)\\bca\\s*:"
+    ],
+    "astSignals": [],
+    "recommendation": "인증서 검증을 비활성화하지 말고 신뢰 가능한 CA, 전용 CA 번들, 인증서 핀닝 등 검증 가능한 TLS 설정을 사용한다.",
+    "kisaReference": "JavaScript 시큐어코딩 가이드 2023",
+    "kisaItem": "제2절 보안기능 > 부적절한 인증서 유효성 검증"
+  },
+  {
+    "id": "JS-KISA-025",
+    "title": "사용자 하드디스크에 저장되는 쿠키를 통한 정보 노출",
+    "category": "보안기능",
+    "severity": "MEDIUM",
+    "cwe": "CWE-539",
+    "detectionType": "AST + Regex",
+    "description": "세션/토큰 쿠키를 httpOnly, secure, sameSite 없이 저장하거나 명시적으로 비활성화하는 패턴을 탐지한다.",
+    "detectPatterns": [
+      "(?is)\\b(?:res|response)\\.cookie\\s*\\(\\s*[\"'](?:session|sid|token|jwt|auth)[\"'][^)]*\\{[^}]*(?:httpOnly\\s*:\\s*false|secure\\s*:\\s*false)",
+      "(?is)\\b(?:res|response)\\.cookie\\s*\\(\\s*[\"'](?:session|sid|token|jwt|auth)[\"']\\s*,\\s*[^,)]*\\)"
+    ],
+    "safePatterns": [
+      "(?is)\\bhttpOnly\\s*:\\s*true",
+      "(?is)\\bsecure\\s*:\\s*true",
+      "(?is)\\bsameSite\\s*:\\s*[\"'](?:strict|lax)[\"']"
+    ],
+    "astSignals": [
+      "call:cookie"
+    ],
+    "recommendation": "세션/토큰 쿠키에는 HttpOnly, Secure, SameSite 속성을 적용하고 민감정보 자체를 쿠키 값에 직접 저장하지 않는다.",
+    "kisaReference": "JavaScript 시큐어코딩 가이드 2023",
+    "kisaItem": "제2절 보안기능 > 사용자 하드디스크에 저장되는 쿠키를 통한 정보 노출"
+  },
+  {
+    "id": "JS-KISA-026",
+    "title": "주석문 안에 포함된 시스템 주요정보",
+    "category": "보안기능",
+    "severity": "MEDIUM",
+    "cwe": "CWE-615",
+    "detectionType": "AST + Regex",
+    "description": "주석에 API 키, 토큰, 비밀번호, 내부 주소 등 시스템 주요정보가 남아 있는 패턴을 탐지한다.",
+    "detectPatterns": [
+      "(?im)^\\s*(?://|/\\*)[^\\n*]*(?:password|passwd|secret|api[_-]?key|token|private[_-]?key|jdbc|mongodb\\+srv)\\s*[:=]\\s*[\"']?[^\"'\\s*]{6,}"
+    ],
+    "safePatterns": [
+      "(?is)(?://|/\\*)\\s*(?:example|sample|placeholder|redacted|masked)"
+    ],
+    "astSignals": [],
+    "includeComments": true,
+    "recommendation": "주석의 비밀값과 내부 연결정보를 제거하고, 예시는 placeholder/redacted 값으로만 남긴다.",
+    "kisaReference": "JavaScript 시큐어코딩 가이드 2023",
+    "kisaItem": "제2절 보안기능 > 주석문 안에 포함된 시스템 주요정보"
+  },
+  {
+    "id": "JS-KISA-027",
+    "title": "솔트 없이 일방향 해쉬 함수 사용",
+    "category": "보안기능",
+    "severity": "MEDIUM",
+    "cwe": "CWE-759",
+    "detectionType": "AST + Regex",
+    "description": "비밀번호를 salt 없는 일반 해시 함수로 처리하는 패턴을 탐지한다.",
+    "detectPatterns": [
+      "(?is)\\bcrypto\\.createHash\\s*\\(\\s*[\"'](?:sha256|sha512|sha1|md5)[\"']\\s*\\)\\.update\\s*\\([^)]*(?:password|passwd|pwd|req\\.body\\.password)"
+    ],
+    "safePatterns": [
+      "(?is)\\b(?:bcrypt|argon2|scrypt|pbkdf2)\\b",
+      "(?is)\\bsalt\\b",
+      "(?is)\\bpasswordHasher\\b"
+    ],
+    "astSignals": [
+      "call:createHash",
+      "call:update"
+    ],
+    "recommendation": "비밀번호는 bcrypt, Argon2, scrypt, PBKDF2처럼 salt와 비용 인자가 있는 전용 KDF로 저장한다.",
+    "kisaReference": "JavaScript 시큐어코딩 가이드 2023",
+    "kisaItem": "제2절 보안기능 > 솔트 없이 일방향 해쉬 함수 사용"
+  },
+  {
+    "id": "JS-KISA-028",
+    "title": "무결성 검사없는 코드 다운로드",
+    "category": "보안기능",
+    "severity": "HIGH",
+    "cwe": "CWE-494",
+    "detectionType": "AST + Regex",
+    "description": "원격 코드/스크립트를 다운로드해 저장하거나 로드하면서 해시/서명 무결성 검증이 보이지 않는 패턴을 탐지한다.",
+    "detectPatterns": [
+      "(?is)\\b(?:https?\\.get|fetch|axios\\.get)\\s*\\([^;]+[\\s\\S]{0,240}\\b(?:createWriteStream|writeFile|writeFileSync)\\s*\\([^)]*\\.(?:js|mjs|cjs|zip|tar)",
+      "(?is)\\bimport\\s*\\(\\s*(?:req\\.|request\\.|ctx\\.|[A-Za-z_$][\\w$]*(?:Url|URL))"
+    ],
+    "safePatterns": [
+      "(?is)\\b(?:sha256|sha512|integrity|signature|verifySignature|subresourceIntegrity)\\b",
+      "(?is)\\bchecksum\\b"
+    ],
+    "astSignals": [
+      "call:get",
+      "call:fetch",
+      "call:createWriteStream",
+      "call:writeFile",
+      "call:writeFileSync"
+    ],
+    "recommendation": "다운로드한 실행 코드/패키지는 고정된 출처에서만 받으며, 저장/로드 전 해시 또는 전자서명을 검증한다.",
+    "kisaReference": "JavaScript 시큐어코딩 가이드 2023",
+    "kisaItem": "제2절 보안기능 > 무결성 검사없는 코드 다운로드"
+  },
+  {
+    "id": "JS-KISA-029",
+    "title": "반복된 인증시도 제한 기능 부재",
+    "category": "보안기능",
+    "severity": "MEDIUM",
+    "cwe": "CWE-307",
+    "detectionType": "AST + Regex",
+    "description": "로그인/인증 라우트에 rate limit, lockout, captcha 같은 반복 시도 제한이 보이지 않는 패턴을 탐지한다.",
+    "detectPatterns": [
+      "(?is)\\b(?:router|app)\\.post\\s*\\(\\s*[\"'][^\"']*(?:login|signin|auth|password)[^\"']*[\"']\\s*,\\s*(?![^)]*(?:rateLimit|loginLimiter|slowDown|captcha|lockout))"
+    ],
+    "safePatterns": [
+      "(?is)\\b(?:rateLimit|loginLimiter|slowDown|captcha|lockout)\\b",
+      "(?is)\\bmaxAttempts\\b"
+    ],
+    "astSignals": [
+      "call:post"
+    ],
+    "recommendation": "인증 엔드포인트에는 계정/IP 기준 rate limit, 지연, 잠금, 알림 정책을 적용한다.",
+    "kisaReference": "JavaScript 시큐어코딩 가이드 2023",
+    "kisaItem": "제2절 보안기능 > 반복된 인증시도 제한 기능 부재"
+  },
+  {
+    "id": "JS-KISA-030",
+    "title": "종료되지 않는 반복문 또는 재귀 함수",
+    "category": "시간 및 상태",
+    "severity": "LOW",
+    "cwe": "CWE-835",
+    "detectionType": "AST + Regex",
+    "description": "명확한 종료 조건이나 break 없이 while(true), for(;;), 자기 재귀가 사용되는 패턴을 탐지한다.",
+    "detectPatterns": [
+      "(?is)\\bwhile\\s*\\(\\s*true\\s*\\)\\s*\\{(?![\\s\\S]{0,240}\\bbreak\\b)",
+      "(?is)\\bfor\\s*\\(\\s*;\\s*;\\s*\\)\\s*\\{(?![\\s\\S]{0,240}\\bbreak\\b)",
+      "(?is)\\bfunction\\s+([A-Za-z_$][\\w$]*)\\s*\\([^)]*\\)\\s*\\{(?![\\s\\S]{0,240}\\bif\\b)[\\s\\S]{0,240}\\b\\1\\s*\\("
+    ],
+    "safePatterns": [
+      "(?is)\\bbreak\\b",
+      "(?is)\\bAbortController\\b|\\btimeout\\b|\\bmaxRetries\\b"
+    ],
+    "astSignals": [],
+    "recommendation": "반복/재귀에는 명확한 종료 조건, 최대 반복 횟수, timeout/cancel 조건을 둔다.",
+    "kisaReference": "JavaScript 시큐어코딩 가이드 2023",
+    "kisaItem": "제3절 시간 및 상태 > 종료되지 않는 반복문 또는 재귀 함수"
+  },
+  {
+    "id": "JS-KISA-031",
+    "title": "오류상황 대응 부재",
+    "category": "에러처리",
+    "severity": "LOW",
+    "cwe": "CWE-390",
+    "detectionType": "AST + Regex",
+    "description": "콜백/Promise 오류를 단순 return 또는 빈 처리로 무시하는 패턴을 탐지한다.",
+    "detectPatterns": [
+      "(?is)\\bif\\s*\\(\\s*(?:err|error)\\s*\\)\\s*\\{?\\s*(?:return\\s*;|return\\s+null\\s*;|return\\s+false\\s*;)\\s*\\}?",
+      "(?is)\\.catch\\s*\\(\\s*\\(?\\s*(?:err|error)?\\s*\\)?\\s*=>\\s*\\{\\s*\\}\\s*\\)"
+    ],
+    "safePatterns": [
+      "(?is)\\b(?:logger|log)\\.error\\s*\\(",
+      "(?is)\\bnext\\s*\\(\\s*(?:err|error)\\s*\\)",
+      "(?is)\\bthrow\\s+(?:err|error)"
+    ],
+    "astSignals": [],
+    "recommendation": "오류는 로깅, 사용자 응답, 롤백, 재시도, 상위 전파 중 하나 이상의 대응 흐름을 갖도록 처리한다.",
+    "kisaReference": "JavaScript 시큐어코딩 가이드 2023",
+    "kisaItem": "제4절 에러처리 > 오류상황 대응 부재"
+  },
+  {
+    "id": "JS-KISA-032",
+    "title": "부적절한 예외 처리",
+    "category": "에러처리",
+    "severity": "LOW",
+    "cwe": "CWE-248",
+    "detectionType": "AST + Regex",
+    "description": "catch 블록이 비어 있거나 예외를 콘솔 출력만 하고 정상 흐름처럼 계속 진행하는 패턴을 탐지한다.",
+    "detectPatterns": [
+      "(?is)\\bcatch\\s*\\([^)]*\\)\\s*\\{\\s*\\}",
+      "(?is)\\bcatch\\s*\\([^)]*\\)\\s*\\{\\s*console\\.(?:log|debug|trace)\\s*\\([^)]*\\)\\s*;?\\s*\\}"
+    ],
+    "safePatterns": [
+      "(?is)\\b(?:logger|log)\\.error\\s*\\(",
+      "(?is)\\bthrow\\b",
+      "(?is)\\breturn\\s+(?:res|response)\\.status\\s*\\("
+    ],
+    "astSignals": [],
+    "recommendation": "예외는 의미 있는 로그, 롤백, 실패 응답, 상위 전파를 포함하도록 처리하고 단순 무시는 금지한다.",
+    "kisaReference": "JavaScript 시큐어코딩 가이드 2023",
+    "kisaItem": "제4절 에러처리 > 부적절한 예외 처리"
+  },
+  {
+    "id": "JS-OWASP-006",
+    "title": "NoSQL Injection",
+    "category": "OWASP JavaScript 추가 룰",
+    "severity": "HIGH",
+    "cwe": "CWE-943",
+    "detectionType": "AST + Regex",
+    "description": "MongoDB/Mongoose 조회 조건에 req.body/query 객체를 그대로 전달하거나 $where에 외부 입력을 사용하는 패턴을 탐지한다.",
+    "detectPatterns": [
+      "(?is)\\b(?:find|findOne|updateOne|deleteOne|aggregate)\\s*\\(\\s*(?:req|request|ctx)\\.(?:body|query|params)",
+      "(?is)\\$where\\s*:\\s*(?:req|request|ctx)\\.(?:body|query|params)"
+    ],
+    "safePatterns": [
+      "(?is)\\b(?:mongoSanitize|expressMongoSanitize|sanitizeFilter)\\s*\\(",
+      "(?is)\\b(?:zod|joi|yup)\\.",
+      "(?is)\\b\\$eq\\b"
+    ],
+    "astSignals": [
+      "call:find",
+      "call:findOne",
+      "call:updateOne",
+      "call:deleteOne",
+      "call:aggregate"
+    ],
+    "recommendation": "사용자 입력 객체를 쿼리 조건에 그대로 넣지 말고 스키마 검증, 연산자 차단, 명시적 필드 매핑을 적용한다.",
+    "kisaReference": "OWASP NoSQL Security Cheat Sheet",
+    "kisaItem": "OWASP JavaScript 추가 룰 > NoSQL Injection"
+  },
+  {
+    "id": "JS-OWASP-007",
+    "title": "JWT 검증 우회 위험",
+    "category": "OWASP JavaScript 추가 룰",
+    "severity": "HIGH",
+    "cwe": "CWE-347",
+    "detectionType": "AST + Regex",
+    "description": "jwt.decode 사용, none 알고리즘 허용, 만료 검증 무시 등 JWT 서명/유효성 검증을 우회할 수 있는 패턴을 탐지한다.",
+    "detectPatterns": [
+      "(?is)\\bjwt\\.decode\\s*\\(\\s*(?:req\\.|request\\.|ctx\\.|token)",
+      "(?is)\\bjwt\\.verify\\s*\\([^)]*\\{[^}]*(?:ignoreExpiration\\s*:\\s*true|algorithms\\s*:\\s*\\[[^\\]]*[\"']none[\"'])"
+    ],
+    "safePatterns": [
+      "(?is)\\bjwt\\.verify\\s*\\(",
+      "(?is)\\balgorithms\\s*:\\s*\\[[^\\]]*[\"'](?:RS256|ES256|HS256)[\"']",
+      "(?is)\\bissuer\\s*:"
+    ],
+    "astSignals": [
+      "call:decode",
+      "call:verify"
+    ],
+    "recommendation": "JWT는 verify로 서명과 만료를 검증하고, 허용 알고리즘/issuer/audience를 명시한다.",
+    "kisaReference": "OWASP JSON Web Token Cheat Sheet / WSTG JWT Testing",
+    "kisaItem": "OWASP JavaScript 추가 룰 > JWT verification"
+  },
+  {
+    "id": "JS-OWASP-008",
+    "title": "Mass Assignment",
+    "category": "OWASP JavaScript 추가 룰",
+    "severity": "MEDIUM",
+    "cwe": "CWE-915",
+    "detectionType": "AST + Regex",
+    "description": "req.body 전체를 도메인 객체, 사용자 모델, 업데이트 메서드에 그대로 할당하는 Mass Assignment 패턴을 탐지한다.",
+    "detectPatterns": [
+      "(?is)\\bObject\\.assign\\s*\\(\\s*[A-Za-z_$][\\w$]*(?:User|Account|Profile|Order|Entity)?\\s*,\\s*(?:req|request|ctx)\\.body",
+      "(?is)\\b(?:create|update|updateOne|findByIdAndUpdate)\\s*\\([^)]*(?:req|request|ctx)\\.body"
+    ],
+    "safePatterns": [
+      "(?is)\\b(?:pick|omit|allowedFields|safeFields|whitelist)\\b",
+      "(?is)\\b(?:zod|joi|yup)\\.",
+      "(?is)\\bselectAllowedFields\\s*\\("
+    ],
+    "astSignals": [
+      "call:Object.assign",
+      "call:create",
+      "call:update",
+      "call:updateOne",
+      "call:findByIdAndUpdate"
+    ],
+    "recommendation": "클라이언트 입력은 허용 필드만 pick하고, 권한 필드(role/isAdmin/balance 등)는 서버 전용 로직에서만 변경한다.",
+    "kisaReference": "OWASP Mass Assignment Cheat Sheet",
+    "kisaItem": "OWASP JavaScript 추가 룰 > Mass Assignment"
+  },
+  {
+    "id": "JS-OWASP-009",
+    "title": "URL에 포함된 민감정보",
+    "category": "OWASP JavaScript 추가 룰",
+    "severity": "MEDIUM",
+    "cwe": "CWE-598",
+    "detectionType": "AST + Regex",
+    "description": "password, token, apiKey 같은 민감정보를 URL query string에 포함해 전송하는 패턴을 탐지한다.",
+    "detectPatterns": [
+      "(?is)\\b(?:fetch|axios\\.get|http\\.get|https\\.get)\\s*\\(\\s*[`\"'][^`\"']*[?&](?:password|passwd|token|api[_-]?key|secret)=",
+      "(?is)[`\"'][^`\"']*[?&](?:password|passwd|token|api[_-]?key|secret)=\\$?\\{?"
+    ],
+    "safePatterns": [
+      "(?is)\\bAuthorization\\s*:"
+    ],
+    "astSignals": [
+      "call:fetch",
+      "call:get"
+    ],
+    "recommendation": "민감정보는 URL이 아니라 POST body 또는 Authorization 헤더로 전송하고 로그/리퍼러에 남지 않도록 한다.",
+    "kisaReference": "OWASP Session Management / Logging guidance",
+    "kisaItem": "OWASP JavaScript 추가 룰 > Sensitive data in URL"
+  },
+  {
+    "id": "JS-OWASP-010",
+    "title": "postMessage 와일드카드 대상",
+    "category": "OWASP JavaScript 추가 룰",
+    "severity": "MEDIUM",
+    "cwe": "CWE-346",
+    "detectionType": "AST + Regex",
+    "description": "window.postMessage 호출에서 targetOrigin을 *로 설정해 민감 데이터가 임의 origin으로 전달될 수 있는 패턴을 탐지한다.",
+    "detectPatterns": [
+      "(?is)\\bpostMessage\\s*\\([^,]+,\\s*[\"']\\*[\"']\\s*\\)"
+    ],
+    "safePatterns": [
+      "(?is)\\btrustedOrigin\\b|\\ballowedOrigin\\b|\\btargetOrigin\\b"
+    ],
+    "astSignals": [
+      "call:postMessage"
+    ],
+    "recommendation": "postMessage targetOrigin은 신뢰 가능한 정확한 origin으로 지정하고, 수신 측에서도 event.origin을 검증한다.",
+    "kisaReference": "OWASP HTML5 Security Cheat Sheet / DOM XSS Prevention",
+    "kisaItem": "OWASP JavaScript 추가 룰 > postMessage targetOrigin"
+  },
+  {
+    "id": "JS-OWASP-011",
+    "title": "Server-Side Template Injection",
+    "category": "OWASP JavaScript 추가 룰",
+    "severity": "HIGH",
+    "cwe": "CWE-1336",
+    "detectionType": "AST + Regex",
+    "description": "사용자 입력을 서버 템플릿 이름이나 템플릿 본문으로 직접 렌더링/컴파일하는 SSTI 위험 패턴을 탐지한다.",
+    "detectPatterns": [
+      "(?is)\\b(?:res|response)\\.render\\s*\\(\\s*(?:req\\.|request\\.|ctx\\.|[A-Za-z_$][\\w$]*(?:Template|View))",
+      "(?is)\\b(?:handlebars|hbs|ejs|pug|nunjucks|lodash|_)\\.(?:compile|render)\\s*\\(\\s*(?:req\\.|request\\.|ctx\\.|[A-Za-z_$][\\w$]*(?:Template|View))"
+    ],
+    "safePatterns": [
+      "(?is)\\ballowedTemplates\\b|\\btemplateMap\\b",
+      "(?is)\\b(?:escape|sanitize)\\s*\\(",
+      "(?is)\\bstrict_variables\\b"
+    ],
+    "astSignals": [
+      "call:render",
+      "call:compile"
+    ],
+    "recommendation": "템플릿 이름과 본문은 서버 내부 허용 목록으로 선택하고, 사용자 입력은 데이터 컨텍스트로만 전달한다.",
+    "kisaReference": "OWASP Web Security Testing Guide - Server-Side Template Injection",
+    "kisaItem": "OWASP JavaScript 추가 룰 > SSTI"
+  }
+]

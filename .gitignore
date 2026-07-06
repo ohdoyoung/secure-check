@@ -1,0 +1,16 @@
+node_modules/
+dist/
+build/
+target/
+.DS_Store
+.env
+.env.*
+!.env.example
+!frontend/.env.example
+!backend/.env.example
+*.log
+*.tsbuildinfo
+.pytest_cache/
+__pycache__/
+frontend/vite.config.js
+frontend/vite.config.d.ts
