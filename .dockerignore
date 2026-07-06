@@ -1,0 +1,17 @@
+.git
+.pytest_cache
+.DS_Store
+docs
+frontend
+tests
+
+backend/target
+backend/.env
+backend/.env.*
+!backend/.env.example
+
+**/node_modules
+**/dist
+**/build
+**/*.log
+**/*.tsbuildinfo
