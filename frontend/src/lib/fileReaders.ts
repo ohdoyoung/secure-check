@@ -179,7 +179,7 @@ function toUserFacingSize(bytes: number) {
   return `${Math.round(bytes / (1024 * 1024))}MB`;
 }
 
-function ensureBrowserUploadCapacity(fileCount: number, nextBytes: number, totalBytes: number) {
+export function ensureBrowserUploadCapacity(fileCount: number, nextBytes: number, totalBytes: number) {
   if (fileCount > MAX_BROWSER_UPLOAD_FILES) {
     throw new Error(`브라우저에서는 한 번에 최대 ${MAX_BROWSER_UPLOAD_FILES}개 파일까지만 읽을 수 있습니다.`);
   }
@@ -195,21 +195,24 @@ export async function readTextFiles(fileList: FileList | File[]) {
   const files = Array.from(fileList);
   let acceptedCount = 0;
   let acceptedBytes = 0;
-  const codeFiles = await Promise.all(
+  const codeFilesWithEmpty = await Promise.all(
     files
       .filter((file) => isSupportedFile(file.webkitRelativePath || file.name))
-      .map(async (file) => {
+      .map(async (file): Promise<CodeFile | null> => {
         const path = file.webkitRelativePath || file.name;
+        const content = await file.text();
+        if (!content.trim()) return null;
         acceptedCount += 1;
         acceptedBytes += file.size;
         ensureBrowserUploadCapacity(acceptedCount, file.size, acceptedBytes);
         return {
           path,
           language: detectLanguage(path),
-          content: await file.text()
+          content
         } satisfies CodeFile;
       })
   );
+  const codeFiles = codeFilesWithEmpty.filter((file): file is CodeFile => file !== null);
   return codeFiles;
 }
 
@@ -261,19 +264,24 @@ export async function readZipBlobWithStats(blob: Blob, options?: ZipReadOptions)
     }))
     .filter((item): item is { entry: JSZip.JSZipObject; normalizedName: string } => item.normalizedName !== null && item.normalizedName !== "");
   const entries = normalizedEntries.filter(({ normalizedName }) => isSupportedFile(normalizedName));
+  let acceptedCount = 0;
   let acceptedBytes = 0;
-  const codeFiles = await Promise.all(
-    entries.map(async ({ entry, normalizedName }, index) => {
+  const codeFilesWithEmpty = await Promise.all(
+    entries.map(async ({ entry, normalizedName }): Promise<CodeFile | null> => {
       const contentBlob = await entry.async("blob");
+      const content = await contentBlob.text();
+      if (!content.trim()) return null;
+      acceptedCount += 1;
       acceptedBytes += contentBlob.size;
-      ensureBrowserUploadCapacity(index + 1, contentBlob.size, acceptedBytes);
+      ensureBrowserUploadCapacity(acceptedCount, contentBlob.size, acceptedBytes);
       return {
         path: normalizedName,
         language: detectLanguage(normalizedName),
-        content: await contentBlob.text()
+        content
       };
     })
   );
+  const codeFiles = codeFilesWithEmpty.filter((file): file is CodeFile => file !== null);
   return {
     files: codeFiles,
     total: normalizedEntries.length,

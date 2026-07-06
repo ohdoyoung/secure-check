@@ -18,10 +18,9 @@ import {
   pastedCodeFileWithLanguage,
   readDroppedItemsWithStats,
   readTextFilesWithStats,
-  readZipBlobWithStats,
   readZipFileWithStats
 } from "../lib/fileReaders";
-import { buildGithubZipUrl, parseGithubRepository } from "../lib/github";
+import { readGithubRepositoryWithStats } from "../lib/github";
 import { useCheckupStore } from "../store/useCheckupStore";
 import type { InputMode, PastedCodeLanguageOption } from "../types/analysis";
 
@@ -43,25 +42,6 @@ const pastedLanguageOptions: Array<{ value: PastedCodeLanguageOption; label: str
   { value: "PHP", label: "PHP" },
   { value: "SQL", label: "SQL" }
 ];
-
-async function fetchGithubZip(zipUrl: string) {
-  const controller = new AbortController();
-  const timeoutId = window.setTimeout(() => controller.abort(), 15000);
-
-  try {
-    return await fetch(zipUrl, { signal: controller.signal });
-  } catch (error) {
-    if (error instanceof DOMException && error.name === "AbortError") {
-      throw new Error("GitHub 응답이 지연되고 있습니다. 잠시 후 다시 시도하거나 ZIP 업로드를 사용해 주세요.");
-    }
-    if (error instanceof TypeError) {
-      throw new Error("GitHub 저장소를 브라우저에서 읽지 못했습니다. 공개 저장소인지 확인하거나 ZIP 업로드를 사용해 주세요.");
-    }
-    throw error;
-  } finally {
-    window.clearTimeout(timeoutId);
-  }
-}
 
 type UploadPanelProps = {
   onAnalysisComplete?: () => void;
@@ -111,8 +91,27 @@ export function UploadPanel({ onAnalysisComplete }: UploadPanelProps) {
   const selectedFileCount = inputMode === "paste" ? (rawCode.trim() ? 1 : 0) : stagedFiles.length;
   const pastedCodeMeta = inputMode === "paste" ? inferPastedCode(rawCode, pastedCodeLanguage) : undefined;
   const isAnalysisRunning = mutation.isPending || analysisPhase === "running";
+  const mutationMessage = mutation.error instanceof Error ? mutation.error.message : "";
+  const feedbackMessage = localMessage || mutationMessage;
+  const feedbackIsError = Boolean(mutationMessage && !localMessage);
+
+  const clearAnalysisFeedback = () => {
+    mutation.reset();
+    setLocalMessage("");
+    setShowCompletionNotice(false);
+  };
+
+  const handleModeSelection = (mode: InputMode) => {
+    clearAnalysisFeedback();
+    if (mode !== inputMode) {
+      setStagedFiles([]);
+      setSelectionAudit(null);
+    }
+    setInputMode(mode);
+  };
 
   const runAnalysis = () => {
+    mutation.reset();
     const files = inputMode === "paste" ? pastedCodeFileWithLanguage(rawCode, pastedCodeLanguage) : stagedFiles;
     if (files.length === 0) {
       setLocalMessage("분석할 코드 파일을 찾지 못했습니다. 폴더 선택 후 파일 수가 0개라면 src, backend, frontend 같은 실제 소스 폴더가 포함된 상위 폴더를 다시 선택해 주세요.");
@@ -155,6 +154,7 @@ export function UploadPanel({ onAnalysisComplete }: UploadPanelProps) {
   };
 
   const handleLoadExample = () => {
+    clearAnalysisFeedback();
     loadExample();
     setSelectionAudit(null);
   };
@@ -167,6 +167,7 @@ export function UploadPanel({ onAnalysisComplete }: UploadPanelProps) {
 
   const handleFileSelection = async (files: FileList | null) => {
     if (!files) return;
+    clearAnalysisFeedback();
     try {
       const stats = await readTextFilesWithStats(files);
       setStagedFiles(stats.files);
@@ -189,6 +190,7 @@ export function UploadPanel({ onAnalysisComplete }: UploadPanelProps) {
   const handleZipSelection = async (files: FileList | null) => {
     const zip = files?.[0];
     if (!zip) return;
+    clearAnalysisFeedback();
     try {
       const stats = await readZipFileWithStats(zip);
       setStagedFiles(stats.files);
@@ -210,46 +212,24 @@ export function UploadPanel({ onAnalysisComplete }: UploadPanelProps) {
   };
 
   const handleGithubImport = async () => {
+    clearAnalysisFeedback();
     setIsReadingGithub(true);
-    setLocalMessage("");
 
     try {
-      const repository = parseGithubRepository(githubUrl);
-      let response: Response | null = null;
-      let resolvedRef = "";
-      let resolvedSubdirectory = "";
-
-      for (const candidate of repository.refCandidates) {
-        response = await fetchGithubZip(buildGithubZipUrl(repository.owner, repository.repo, candidate.ref));
-        if (response.ok) {
-          resolvedRef = candidate.ref;
-          resolvedSubdirectory = candidate.subdirectory;
-          break;
-        }
-      }
-
-      if (!response?.ok) {
-        const status = response?.status ?? "network";
-        throw new Error(`GitHub 저장소를 읽지 못했습니다. 기본 브랜치가 main이 아니면 /tree/브랜치 URL로 다시 시도해 주세요. (${status})`);
-      }
-
-      const stats = await readZipBlobWithStats(await response.blob(), {
-        stripFirstPathSegment: true,
-        subdirectory: resolvedSubdirectory
-      });
+      const stats = await readGithubRepositoryWithStats(githubUrl);
       setStagedFiles(stats.files);
       setSelectionAudit({
-        source: resolvedSubdirectory ? `GitHub ZIP · ${resolvedSubdirectory}` : "GitHub ZIP",
+        source: stats.resolvedSubdirectory ? `GitHub · ${stats.resolvedSubdirectory}` : "GitHub",
         total: stats.total,
         accepted: stats.accepted,
         ignored: stats.ignored
       });
       setInputMode("github");
-      setProjectName(repository.projectName);
+      setProjectName(stats.projectName);
       setLocalMessage(
         stats.files.length > 0
-          ? `${repository.projectName}@${resolvedRef}${resolvedSubdirectory ? `/${resolvedSubdirectory}` : ""}에서 ${stats.files.length}개 코드/설정 파일을 읽었습니다.`
-          : resolvedSubdirectory
+          ? `${stats.projectName}@${stats.resolvedRef}${stats.resolvedSubdirectory ? `/${stats.resolvedSubdirectory}` : ""}에서 ${stats.files.length}개 코드/설정 파일을 읽었습니다.`
+          : stats.resolvedSubdirectory
             ? "선택한 GitHub 하위 폴더에서 분석 가능한 코드 파일을 찾지 못했습니다."
             : "저장소에서 분석 가능한 코드 파일을 찾지 못했습니다."
       );
@@ -265,6 +245,7 @@ export function UploadPanel({ onAnalysisComplete }: UploadPanelProps) {
   const handleDrop = async (event: React.DragEvent<HTMLDivElement>) => {
     event.preventDefault();
     setIsDragging(false);
+    clearAnalysisFeedback();
     try {
       if (event.dataTransfer.items.length > 0) {
         const stats = await readDroppedItemsWithStats(event.dataTransfer.items);
@@ -350,7 +331,7 @@ export function UploadPanel({ onAnalysisComplete }: UploadPanelProps) {
                 <button
                   key={mode}
                   type="button"
-                  onClick={() => setInputMode(mode)}
+                  onClick={() => handleModeSelection(mode)}
                   className={`flex h-10 w-full items-center justify-between rounded-md px-3 text-sm font-bold transition ${
                     inputMode === mode
                       ? "border border-slate-300 bg-white text-slate-950 shadow-panel"
@@ -444,7 +425,10 @@ export function UploadPanel({ onAnalysisComplete }: UploadPanelProps) {
                 </div>
                 <textarea
                   value={rawCode}
-                  onChange={(event) => setRawCode(event.target.value)}
+                  onChange={(event) => {
+                    mutation.reset();
+                    setRawCode(event.target.value);
+                  }}
                   placeholder={"검진할 코드를 붙여넣으세요.\n예: Express 라우터, Spring Controller, Python API 핸들러"}
                   className="scrollbar-thin h-[377px] w-full resize-none rounded-b-lg border-0 bg-white p-5 font-mono text-sm leading-6 text-slate-800 focus:outline-none"
                 />
@@ -517,9 +501,9 @@ export function UploadPanel({ onAnalysisComplete }: UploadPanelProps) {
             {...{ webkitdirectory: "", directory: "" }}
           />
 
-          {(localMessage || mutation.error) && (
-            <p className={`mt-4 text-sm font-semibold ${mutation.error ? "text-red-600" : "text-slate-500"}`}>
-              {mutation.error instanceof Error ? mutation.error.message : localMessage}
+          {feedbackMessage && (
+            <p className={`mt-4 text-sm font-semibold ${feedbackIsError ? "text-red-600" : "text-slate-500"}`}>
+              {feedbackMessage}
             </p>
           )}
 
@@ -716,7 +700,7 @@ function GithubState({ value, loading, onChange, onSubmit }: GithubStateProps) {
         </div>
         <h2 className="mt-4 text-center text-lg font-black text-slate-950">GitHub 저장소</h2>
         <p className="mt-1 text-center text-sm font-semibold text-slate-500">
-          공개 저장소와 /tree/브랜치 URL을 지원합니다.
+          공개 저장소와 /tree/브랜치/하위폴더 URL을 지원합니다.
         </p>
         <div className="mt-5 flex flex-col gap-2 sm:flex-row">
           <input

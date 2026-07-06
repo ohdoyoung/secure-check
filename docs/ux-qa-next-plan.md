@@ -21,7 +21,7 @@
 | Semgrep smoke | Semgrep CLI 설치 환경에서 로컬 rule 기반 SQLi/CMDi 매핑을 검증하는 smoke test 추가 | 완료 |
 | 결과 화면 고도화 | 취약 파일 드릴다운, 먼저 볼 항목, 탐지 근거, 왜 탐지됐나, 수정 예시/권장 조치 연결 | 완료 |
 | 진단 완료 이동 UX | 완료 배너, 결과 섹션 하이라이트, `#checkup-dashboard` 앵커 이동, severity/감점 요약 표시 | 완료 |
-| GitHub URL 분석 | 공개 GitHub 저장소 ZIP을 읽어 기존 프로젝트 건강검진 흐름으로 분석 | 완료 |
+| GitHub URL 분석 | 공개 GitHub 저장소를 GitHub API/raw 파일 reader로 읽어 기존 프로젝트 건강검진 흐름으로 분석 | 완료 |
 | 검증률 패널 | KISA 커버리지, 활성 룰, 샘플 검증 수, curated Precision/Recall을 결과 화면에 표시 | 완료 |
 | 외부 분석기 상태 | Semgrep 활성/설치/탐지 수와 메시지를 API, UI, HTML 리포트에 표시 | 완료 |
 | 진단서 UX | HTML 리포트 미리보기 모달과 브라우저 인쇄 기반 PDF 출력 버튼 추가 | 완료 |

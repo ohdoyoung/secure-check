@@ -29,7 +29,7 @@ AI 기반 시큐어코딩 건강검진 서비스
 - **TailwindCSS**: Apple Health, Notion, Linear, Vercel Dashboard 느낌의 미니멀 UI를 빠르게 구성하기 위해 사용했습니다.
 - **Zustand**: 업로드 상태, 검사 결과, 최근 이력처럼 전역이지만 무겁지 않은 상태를 간결하게 관리합니다.
 - **React Query**: 분석 요청의 loading/error/success 흐름을 명확하게 다루고, 향후 비동기 job polling 구조로 확장하기 좋습니다.
-- **JSZip**: 브라우저에서 ZIP과 공개 GitHub 저장소 ZIP을 먼저 풀어 프로젝트 단위 분석 요청을 만들 수 있습니다.
+- **JSZip + GitHub API**: 브라우저에서 ZIP을 풀고, 공개 GitHub 저장소는 GitHub API와 raw 파일 fetch로 프로젝트 단위 분석 요청을 만들 수 있습니다.
 
 ### Backend
 
@@ -232,7 +232,7 @@ python3 tests/semgrep_cli_smoke.py
 9. 실제 QA 중 발견한 Python parameterized SQL 오탐, `escape-html` sanitizer 오탐, 새 분석 후 필터 잔존 UX를 회귀 테스트와 함께 보정했습니다.
 10. 안전 코드만 보는 인상을 줄이기 위해 실제 서비스형 취약 코드 묶음 5개를 별도 QA로 추가하고, API와 브라우저에서 반복 검증했습니다.
 11. 결과 화면을 수정 우선순위 보드로 고도화해 파일별 drill-down, 우선순위 정렬, KISA/OWASP/다언어 룰 필터, 탐지 근거와 “왜 탐지됐나” 설명을 한 화면에 연결했습니다.
-12. 공개 GitHub 저장소 URL을 ZIP으로 읽어 기존 프로젝트 분석 흐름으로 넘기는 MVP를 추가했습니다.
+12. 공개 GitHub 저장소 URL을 GitHub API/raw 파일 reader로 읽어 기존 프로젝트 분석 흐름으로 넘기는 MVP를 추가했습니다.
 13. 진단 완료 후 결과 대시보드로 자동 이동하고 결과 요약/감점/우선 조치가 바로 보이도록 완료 애니메이션과 하이라이트를 보강했습니다.
 14. finding 상세에 전후 라인 컨텍스트를 추가해 실제 탐지 라인과 주변 코드를 함께 확인할 수 있게 했습니다.
 15. 결과 화면에 검증률 패널과 Semgrep 외부 분석기 상태를 추가해 현재 룰셋 신뢰도와 외부 SAST 연결 여부를 분리해 보여줍니다.
@@ -242,7 +242,7 @@ python3 tests/semgrep_cli_smoke.py
 ## 한계점
 
 - 현재 분석은 정규식 기반 휴리스틱이라 false positive/false negative가 발생할 수 있습니다.
-- GitHub URL 분석은 공개 저장소 ZIP 기반 MVP이며, private repository 인증, clone 기반 분석, PR 코멘트는 아직 없습니다.
+- GitHub URL 분석은 공개 저장소 API 기반 MVP이며, private repository 인증, clone 기반 분석, PR 코멘트는 아직 없습니다.
 - 검사 이력은 프론트 localStorage에 저장되며, 사용자별 DB 저장은 TiDB 연동 후 구현 예정입니다.
 - PDF 리포트는 브라우저 인쇄 기반 저장을 지원하며, 서버 사이드 PDF 생성과 템플릿 버전 관리는 아직 없습니다.
 - 대용량 프로젝트는 MVP 수준의 비동기 요청 상태만 제공하며, job queue와 polling은 향후 작업입니다.

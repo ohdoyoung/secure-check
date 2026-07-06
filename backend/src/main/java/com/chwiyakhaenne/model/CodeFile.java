@@ -1,10 +1,11 @@
 package com.chwiyakhaenne.model;
 
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 
 public record CodeFile(
         @NotBlank String path,
         String language,
-        @NotBlank String content
+        @NotNull String content
 ) {
 }

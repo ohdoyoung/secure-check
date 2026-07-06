@@ -512,9 +512,9 @@ function RuleScopeBadge({ scope }: { scope: RuleScope }) {
 
 function CountPill({ label, value, className }: { label: string; value: number; className: string }) {
   return (
-    <div className={`rounded-md border px-3 py-2 ${className}`}>
-      <p className="text-[11px] font-black">{label}</p>
-      <p className="mt-1 text-sm font-black">{value}개</p>
+    <div className={`min-w-0 rounded-md border px-2 py-2 text-center ${className}`}>
+      <p className="truncate whitespace-nowrap text-[10px] font-black leading-4">{label}</p>
+      <p className="mt-1 whitespace-nowrap text-base font-black leading-5 tabular-nums">{value}개</p>
     </div>
   );
 }
