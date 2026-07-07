@@ -18,6 +18,16 @@ export type PastedCodeLanguageOption =
 export type AnalyzeRequest = {
   projectName: string;
   files: CodeFile[];
+  suppressions?: FindingSuppression[];
+};
+
+export type FindingSuppression = {
+  scope: "rule" | "file" | "finding";
+  ruleId?: string;
+  filePath?: string;
+  lineNumber?: number;
+  findingId?: string;
+  reason?: string;
 };
 
 export type Finding = {
@@ -54,6 +64,13 @@ export type SeverityCount = {
   total: number;
 };
 
+export type ScoreBreakdown = {
+  highPenalty: number;
+  mediumPenalty: number;
+  lowPenalty: number;
+  totalPenalty: number;
+};
+
 export type FileRiskSummary = {
   path: string;
   severityCount: SeverityCount;
@@ -76,10 +93,12 @@ export type AnalysisResult = {
   score: number;
   verdict: string;
   severityCount: SeverityCount;
+  scoreBreakdown?: ScoreBreakdown;
   findings: Finding[];
   fileSummaries: FileRiskSummary[];
   topRiskFiles: FileRiskSummary[];
   tree: ProjectTreeNode;
+  suppressedFindingCount?: number;
   analyzerStatuses?: AnalyzerStatus[];
   htmlReport: string;
   sarifReport?: string;

@@ -7,8 +7,8 @@ spring:
     name: chwiyakhaenne
   servlet:
     multipart:
-      max-file-size: 2MB
-      max-request-size: 25MB
+      max-file-size: 25MB
+      max-request-size: 30MB
 
 chwiyakhaenne:
   cors:

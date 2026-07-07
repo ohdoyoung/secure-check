@@ -50,13 +50,13 @@ export function FileRiskTable({ files, selectedFile, onFileSelect }: FileRiskTab
                   : "border-slate-200 bg-slate-50 text-slate-900 hover:border-slate-300 hover:bg-white"
               }`}
             >
-              <div className="grid gap-3 md:grid-cols-[1fr_auto] md:items-center">
+              <div className="grid gap-3">
                 <div className="flex min-w-0 items-center gap-3">
                   <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-md border ${active ? "border-white/10 bg-white/10 text-white" : "border-slate-200 bg-white text-slate-600"}`}>
                     <FileCode2 size={18} />
                   </div>
                   <div className="min-w-0">
-                    <div className="flex items-center gap-2">
+                    <div className="flex min-w-0 items-center gap-2">
                       <span className={`inline-flex h-6 items-center rounded-md px-2 text-[11px] font-black ${active ? "bg-white text-slate-950" : "bg-slate-950 text-white"}`}>
                         #{index + 1}
                       </span>

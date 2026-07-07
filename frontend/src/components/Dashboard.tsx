@@ -1,4 +1,5 @@
 import { AlertTriangle, BadgeCheck, Calculator, ClipboardCheck, FileWarning, ShieldCheck, Stethoscope, Target } from "lucide-react";
+import { getScoreBreakdown } from "../lib/scoring";
 import type { AnalysisResult } from "../types/analysis";
 import { ScoreGauge } from "./ScoreGauge";
 import { StatCard } from "./StatCard";
@@ -19,10 +20,8 @@ export function Dashboard({ result }: { result: AnalysisResult }) {
   const owaspFindingCount = result.findings.filter((finding) => finding.ruleId?.startsWith("JS-OWASP-")).length;
   const catalogFindingCount = result.findings.filter((finding) => CATALOG_RULE_PATTERN.test(finding.ruleId ?? "")).length;
   const ruleBackedFindingCount = kisaFindingCount + owaspFindingCount + catalogFindingCount;
-  const highPenalty = result.severityCount.high * 12;
-  const mediumPenalty = result.severityCount.medium * 6;
-  const lowPenalty = result.severityCount.low * 2;
-  const totalPenalty = highPenalty + mediumPenalty + lowPenalty;
+  const scoreBreakdown = getScoreBreakdown(result);
+  const suppressedFindingCount = result.suppressedFindingCount ?? 0;
   const priorityFindings = [...result.findings]
     .sort((a, b) => severityRank[b.severity] - severityRank[a.severity] || a.filePath.localeCompare(b.filePath) || a.lineNumber - b.lineNumber)
     .slice(0, 3);
@@ -102,13 +101,13 @@ export function Dashboard({ result }: { result: AnalysisResult }) {
             </div>
             <span className="inline-flex items-center gap-1.5 rounded-md border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-black text-slate-600">
               <Calculator size={13} />
-              100 - {Math.min(totalPenalty, 100)} = {result.score}
+              100 - {scoreBreakdown.totalPenalty} = {result.score}
             </span>
           </div>
           <div className="mt-4 grid gap-3 sm:grid-cols-4">
-            <PenaltyItem label="HIGH" count={result.severityCount.high} unit={12} penalty={highPenalty} tone="text-red-600" />
-            <PenaltyItem label="MEDIUM" count={result.severityCount.medium} unit={6} penalty={mediumPenalty} tone="text-amber-600" />
-            <PenaltyItem label="LOW" count={result.severityCount.low} unit={2} penalty={lowPenalty} tone="text-blue-600" />
+            <PenaltyItem label="HIGH" count={result.severityCount.high} limit={82} penalty={scoreBreakdown.highPenalty} tone="text-red-600" />
+            <PenaltyItem label="MEDIUM" count={result.severityCount.medium} limit={13} penalty={scoreBreakdown.mediumPenalty} tone="text-amber-600" />
+            <PenaltyItem label="LOW" count={result.severityCount.low} limit={5} penalty={scoreBreakdown.lowPenalty} tone="text-blue-600" />
             <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2.5">
               <p className="text-xs font-black uppercase text-slate-400">최종 점수</p>
               <p className="mt-1 text-sm font-black text-slate-950">{result.score}점</p>
@@ -127,12 +126,13 @@ export function Dashboard({ result }: { result: AnalysisResult }) {
               KISA Coverage 76.19%
             </span>
           </div>
-          <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+          <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-6">
             <MetricItem label="활성 룰" value="166개" />
             <MetricItem label="KISA 구현" value="32 / 42" />
             <MetricItem label="샘플 검증" value="332개" />
             <MetricItem label="룰 기반 탐지" value={`${ruleBackedFindingCount}개`} />
             <MetricItem label="다언어 탐지" value={`${catalogFindingCount}개`} />
+            <MetricItem label="룰 제외" value={`${suppressedFindingCount}개`} />
           </div>
           <div className="mt-4 flex items-start gap-2 rounded-md border border-slate-200 bg-slate-50 px-3 py-2.5 text-xs font-semibold leading-5 text-slate-600">
             <ClipboardCheck size={15} className="mt-0.5 shrink-0 text-slate-500" />
@@ -144,12 +144,12 @@ export function Dashboard({ result }: { result: AnalysisResult }) {
   );
 }
 
-function PenaltyItem({ label, count, unit, penalty, tone }: { label: string; count: number; unit: number; penalty: number; tone: string }) {
+function PenaltyItem({ label, count, limit, penalty, tone }: { label: string; count: number; limit: number; penalty: number; tone: string }) {
   return (
     <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2.5">
       <p className="text-xs font-black uppercase text-slate-400">{label}</p>
       <p className={`mt-1 text-sm font-black ${tone}`}>-{penalty}점</p>
-      <p className="mt-1 text-xs font-semibold text-slate-500">{count}개 x {unit}점</p>
+      <p className="mt-1 text-xs font-semibold text-slate-500">{count}개 · 최대 {limit}점</p>
     </div>
   );
 }

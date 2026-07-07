@@ -21,8 +21,9 @@ import java.util.zip.ZipInputStream;
 public class UploadFileReader {
 
     private static final int MAX_UPLOAD_PARTS = 250;
-    private static final int MAX_ANALYZED_FILES = 2_000;
-    private static final int MAX_ZIP_ENTRIES = 2_000;
+    private static final int MAX_ANALYZED_FILES = 10_000;
+    private static final int MAX_ZIP_ENTRIES = 50_000;
+    private static final int MAX_ARCHIVE_BYTES = 25 * 1024 * 1024;
     private static final int MAX_ENTRY_BYTES = 2 * 1024 * 1024;
     private static final int MAX_TOTAL_BYTES = 20 * 1024 * 1024;
     private static final int MAX_PATH_LENGTH = 500;
@@ -39,14 +40,15 @@ public class UploadFileReader {
         int totalBytes = 0;
         for (MultipartFile file : files) {
             String fileName = safePath(file.getOriginalFilename(), "UPLOAD");
-            ensureEntryWithinLimit(file.getSize(), "UPLOAD file exceeds the maximum supported size.");
             if (fileName.toLowerCase(Locale.ROOT).endsWith(".zip")) {
+                ensureUploadWithinLimit(file.getSize(), MAX_ARCHIVE_BYTES, "UPLOAD archive exceeds the maximum supported size.");
                 ReadBatch zipBatch = readZip(file.getBytes());
                 totalBytes = addToTotalBytes(totalBytes, zipBatch.totalBytes(), "UPLOAD total supported content exceeds the maximum allowed size.");
                 ensureAnalyzedFileCount(codeFiles.size() + zipBatch.codeFiles().size());
                 codeFiles.addAll(zipBatch.codeFiles());
                 continue;
             }
+            ensureEntryWithinLimit(file.getSize(), "UPLOAD file exceeds the maximum supported size.");
             if (LanguageDetector.isSupported(fileName)) {
                 byte[] content = file.getBytes();
                 ensureEntryWithinLimit(content.length, "UPLOAD file exceeds the maximum supported size.");
@@ -115,7 +117,11 @@ public class UploadFileReader {
     }
 
     private void ensureEntryWithinLimit(long bytes, String message) throws IOException {
-        if (bytes > MAX_ENTRY_BYTES) {
+        ensureUploadWithinLimit(bytes, MAX_ENTRY_BYTES, message);
+    }
+
+    private void ensureUploadWithinLimit(long bytes, int maxBytes, String message) throws IOException {
+        if (bytes > maxBytes) {
             throw new IOException(message);
         }
     }

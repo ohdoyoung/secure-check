@@ -8,7 +8,9 @@ import com.chwiyakhaenne.model.AnalyzeRequest;
 import com.chwiyakhaenne.model.CodeFile;
 import com.chwiyakhaenne.model.FileRiskSummary;
 import com.chwiyakhaenne.model.Finding;
+import com.chwiyakhaenne.model.FindingSuppression;
 import com.chwiyakhaenne.model.ProjectTreeNode;
+import com.chwiyakhaenne.model.ScoreBreakdown;
 import com.chwiyakhaenne.model.Severity;
 import com.chwiyakhaenne.model.SeverityCount;
 import com.chwiyakhaenne.report.HtmlReportGenerator;
@@ -28,6 +30,13 @@ import java.util.stream.Collectors;
 
 @Service
 public class StaticRuleAnalyzer implements AnalyzerEngine {
+
+    private static final int HIGH_MAX_PENALTY = 82;
+    private static final int MEDIUM_MAX_PENALTY = 13;
+    private static final int LOW_MAX_PENALTY = 5;
+    private static final double HIGH_CURVE = 12.0;
+    private static final double MEDIUM_CURVE = 18.0;
+    private static final double LOW_CURVE = 30.0;
 
     private final List<SecurityRule> rules;
     private final List<ExternalAnalyzerPort> externalAnalyzers;
@@ -64,9 +73,13 @@ public class StaticRuleAnalyzer implements AnalyzerEngine {
         findings = deduplicate(findings).stream()
                 .sorted(findingComparator())
                 .toList();
+        int unsuppressedFindingCount = findings.size();
+        findings = applySuppressions(findings, request.suppressions());
+        int suppressedFindingCount = unsuppressedFindingCount - findings.size();
 
         SeverityCount totalCount = count(findings);
-        int score = calculateScore(totalCount);
+        ScoreBreakdown scoreBreakdown = calculateScoreBreakdown(totalCount);
+        int score = calculateScore(scoreBreakdown);
         String verdict = verdict(score);
         List<FileRiskSummary> summaries = summarizeFiles(files, findings);
         List<FileRiskSummary> topRiskFiles = summaries.stream()
@@ -82,10 +95,12 @@ public class StaticRuleAnalyzer implements AnalyzerEngine {
                 score,
                 verdict,
                 totalCount,
+                scoreBreakdown,
                 findings,
                 summaries,
                 topRiskFiles,
                 tree,
+                suppressedFindingCount,
                 analyzerStatuses,
                 "",
                 ""
@@ -96,10 +111,12 @@ public class StaticRuleAnalyzer implements AnalyzerEngine {
                 result.score(),
                 result.verdict(),
                 result.severityCount(),
+                result.scoreBreakdown(),
                 result.findings(),
                 result.fileSummaries(),
                 result.topRiskFiles(),
                 result.tree(),
+                result.suppressedFindingCount(),
                 result.analyzerStatuses(),
                 htmlReportGenerator.generate(result),
                 sarifReportGenerator.generate(result)
@@ -153,6 +170,22 @@ public class StaticRuleAnalyzer implements AnalyzerEngine {
         return new ArrayList<>(byLocationAndRule.values());
     }
 
+    private List<Finding> applySuppressions(List<Finding> findings, List<FindingSuppression> suppressions) {
+        if (suppressions == null || suppressions.isEmpty()) {
+            return findings;
+        }
+        List<FindingSuppression> activeSuppressions = suppressions.stream()
+                .filter(Objects::nonNull)
+                .filter(FindingSuppression::usable)
+                .toList();
+        if (activeSuppressions.isEmpty()) {
+            return findings;
+        }
+        return findings.stream()
+                .filter(finding -> activeSuppressions.stream().noneMatch(suppression -> suppression.matches(finding)))
+                .toList();
+    }
+
     private String deduplicationKey(Finding finding) {
         String ruleKey = normalizeKey(finding.ruleId());
         if (ruleKey.isBlank()) {
@@ -200,9 +233,24 @@ public class StaticRuleAnalyzer implements AnalyzerEngine {
         return SeverityCount.of(high, medium, low);
     }
 
-    private int calculateScore(SeverityCount count) {
-        int penalty = count.high() * 12 + count.medium() * 6 + count.low() * 2;
-        return Math.max(0, 100 - penalty);
+    private ScoreBreakdown calculateScoreBreakdown(SeverityCount count) {
+        int highPenalty = severityPenalty(count.high(), HIGH_MAX_PENALTY, HIGH_CURVE);
+        int mediumPenalty = severityPenalty(count.medium(), MEDIUM_MAX_PENALTY, MEDIUM_CURVE);
+        int lowPenalty = severityPenalty(count.low(), LOW_MAX_PENALTY, LOW_CURVE);
+        int totalPenalty = Math.min(100, highPenalty + mediumPenalty + lowPenalty);
+        return new ScoreBreakdown(highPenalty, mediumPenalty, lowPenalty, totalPenalty);
+    }
+
+    private int severityPenalty(int count, int maxPenalty, double curve) {
+        if (count <= 0) {
+            return 0;
+        }
+        int penalty = (int) Math.round(maxPenalty * (1 - Math.exp(-count / curve)));
+        return Math.min(maxPenalty, Math.max(1, penalty));
+    }
+
+    private int calculateScore(ScoreBreakdown scoreBreakdown) {
+        return Math.max(0, 100 - scoreBreakdown.totalPenalty());
     }
 
     private String verdict(int score) {

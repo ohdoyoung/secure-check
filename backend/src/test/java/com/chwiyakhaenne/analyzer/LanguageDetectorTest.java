@@ -25,4 +25,12 @@ class LanguageDetectorTest {
         assertThat(LanguageDetector.isSupported("requirements-dev.txt")).isTrue();
         assertThat(LanguageDetector.detect("requirements-dev.txt", null)).isEqualTo("Dependency");
     }
+
+    @Test
+    void ignoresDependencyBuildAndVirtualEnvironmentPaths() {
+        assertThat(LanguageDetector.isSupported("node_modules/package/index.js")).isFalse();
+        assertThat(LanguageDetector.isSupported("vendor/package/src/Client.php")).isFalse();
+        assertThat(LanguageDetector.isSupported(".venv/lib/site-packages/app.py")).isFalse();
+        assertThat(LanguageDetector.isSupported("src/.env.local")).isTrue();
+    }
 }

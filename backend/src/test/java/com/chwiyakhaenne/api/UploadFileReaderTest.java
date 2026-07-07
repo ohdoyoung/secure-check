@@ -139,12 +139,17 @@ class UploadFileReaderTest {
                 "files",
                 "project.zip",
                 "application/zip",
-                "a".repeat(2 * 1024 * 1024 + 1).getBytes(StandardCharsets.UTF_8)
-        );
+                "small".getBytes(StandardCharsets.UTF_8)
+        ) {
+            @Override
+            public long getSize() {
+                return 25L * 1024 * 1024 + 1;
+            }
+        };
 
         assertThatThrownBy(() -> uploadFileReader.read(List.of(zipFile)))
                 .isInstanceOf(IOException.class)
-                .hasMessageContaining("UPLOAD file exceeds");
+                .hasMessageContaining("UPLOAD archive exceeds");
     }
 
     @Test
@@ -192,9 +197,9 @@ class UploadFileReaderTest {
 
     @Test
     void rejectsZipArchiveWithTooManyEntries() throws IOException {
-        ZipEntryData[] entries = new ZipEntryData[2_001];
+        ZipEntryData[] entries = new ZipEntryData[50_001];
         for (int index = 0; index < entries.length; index++) {
-            entries[index] = entry("src/file-" + index + ".js", "const ok = true;");
+            entries[index] = entry("notes/file-" + index + ".txt", "ignore");
         }
 
         MockMultipartFile zipFile = new MockMultipartFile(

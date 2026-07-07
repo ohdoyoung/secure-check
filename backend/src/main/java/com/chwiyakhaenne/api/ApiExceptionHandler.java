@@ -14,6 +14,13 @@ public class ApiExceptionHandler {
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<Map<String, String>> handleValidation(MethodArgumentNotValidException exception) {
+        boolean fileCountExceeded = exception.getBindingResult().getFieldErrors().stream()
+                .anyMatch(error -> "files".equals(error.getField()) && "Size".equals(error.getCode()));
+        if (fileCountExceeded) {
+            return ResponseEntity.badRequest().body(Map.of(
+                    "message", "분석 대상 파일은 최대 10,000개까지 지원합니다. 의존성, 빌드 산출물, 가상환경 폴더를 제외하고 다시 선택해 주세요."
+            ));
+        }
         return ResponseEntity.badRequest().body(Map.of(
                 "message", "분석할 코드 파일이 필요합니다."
         ));

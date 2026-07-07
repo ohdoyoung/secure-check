@@ -5,6 +5,7 @@ import com.chwiyakhaenne.model.AnalyzerStatus;
 import com.chwiyakhaenne.model.FileRiskSummary;
 import com.chwiyakhaenne.model.Finding;
 import com.chwiyakhaenne.model.ProjectTreeNode;
+import com.chwiyakhaenne.model.ScoreBreakdown;
 import com.chwiyakhaenne.model.Severity;
 import com.chwiyakhaenne.model.SeverityCount;
 import org.junit.jupiter.api.Test;
@@ -44,13 +45,15 @@ class HtmlReportGeneratorTest {
         AnalysisResult result = new AnalysisResult(
                 "report-project",
                 OffsetDateTime.parse("2026-06-15T12:00:00+09:00"),
-                0,
+                28,
                 "입원 권장",
                 SeverityCount.of(18, 17, 0),
+                new ScoreBreakdown(64, 8, 0, 72),
                 findings,
                 List.of(new FileRiskSummary("src/App35.js", SeverityCount.of(1, 0, 0), 1, 100)),
                 List.of(new FileRiskSummary("src/App35.js", SeverityCount.of(1, 0, 0), 1, 100)),
                 new ProjectTreeNode("project", "", "directory"),
+                2,
                 List.of(new AnalyzerStatus("Semgrep", false, false, 0, "테스트 비활성")),
                 "",
                 ""
@@ -63,5 +66,6 @@ class HtmlReportGeneratorTest {
         assertThat(html).contains("테스트 취약점 35");
         assertThat(html).contains("외부 분석기 상태");
         assertThat(html).contains("코드 컨텍스트");
+        assertThat(html).contains("억제됨");
     }
 }

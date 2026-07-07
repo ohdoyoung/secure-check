@@ -2,6 +2,7 @@ import { useRef, useState } from "react";
 import {
   Activity,
   Archive,
+  ChevronDown,
   CheckCircle2,
   ClipboardEdit,
   FileCode2,
@@ -9,6 +10,7 @@ import {
   Github,
   Loader2,
   Play,
+  SlidersHorizontal,
   ShieldCheck,
   UploadCloud
 } from "lucide-react";
@@ -22,7 +24,7 @@ import {
 } from "../lib/fileReaders";
 import { readGithubRepositoryWithStats } from "../lib/github";
 import { useCheckupStore } from "../store/useCheckupStore";
-import type { InputMode, PastedCodeLanguageOption } from "../types/analysis";
+import type { FindingSuppression, InputMode, PastedCodeLanguageOption } from "../types/analysis";
 
 const modes: Array<{ mode: InputMode; label: string; icon: typeof ClipboardEdit; recommended?: boolean }> = [
   { mode: "paste", label: "코드 입력", icon: ClipboardEdit },
@@ -42,6 +44,87 @@ const pastedLanguageOptions: Array<{ value: PastedCodeLanguageOption; label: str
   { value: "PHP", label: "PHP" },
   { value: "SQL", label: "SQL" }
 ];
+
+type RuleExclusionPreset = {
+  id: string;
+  label: string;
+  description: string;
+  ruleIds: string[];
+};
+
+const ruleExclusionPresets: RuleExclusionPreset[] = [
+  {
+    id: "dependency-import",
+    label: "의존성 신호",
+    description: "패키지/레지스트리/import 계열",
+    ruleIds: [
+      "GEN_DEPENDENCY_HTTP_001",
+      "GEN_DEPENDENCY_WILDCARD_VERSION_001",
+      "GEN_GITHUB_ACTION_UNPINNED_001",
+      "GEN_NPM_INSTALL_SCRIPT_001",
+      "PY_REQUESTS_NO_TIMEOUT_001",
+      "PY_XML_XXE_001"
+    ]
+  },
+  {
+    id: "low-signal",
+    label: "정보성 룰",
+    description: "상세 예외, target_blank 등",
+    ruleIds: [
+      "BUILTIN_DEPRECATED_API_001",
+      "BUILTIN_DEBUG_CODE_001",
+      "BUILTIN_EXCEPTION_HANDLING_001",
+      "GEN_ERROR_001",
+      "JS-KISA-012",
+      "PHP_ERROR_001",
+      "REACT_TARGET_BLANK_001"
+    ]
+  },
+  {
+    id: "dev-config",
+    label: "개발용 설정",
+    description: "DEBUG, H2 console 등",
+    ruleIds: [
+      "PY_FLASK_DEBUG_001",
+      "PY_DJANGO_DEBUG_001",
+      "SPRING_H2_CONSOLE_001",
+      "NODE_GRAPHQL_INTROSPECTION_001"
+    ]
+  },
+  {
+    id: "quality-logging",
+    label: "로그·품질 신호",
+    description: "민감 로그, any 캐스팅 등",
+    ruleIds: [
+      "BUILTIN_SENSITIVE_LOG_001",
+      "GEN_LOG_001",
+      "JAVA_LOG_001",
+      "TS_TYPE_001",
+      "JAVA_RANDOM_001"
+    ]
+  }
+];
+
+function buildRuleSuppressions(enabledPresetIds: string[]): FindingSuppression[] {
+  const selectedPresetIds = new Set(enabledPresetIds);
+  const reasons = new Map<string, string>();
+
+  for (const preset of ruleExclusionPresets) {
+    if (!selectedPresetIds.has(preset.id)) continue;
+
+    for (const ruleId of preset.ruleIds) {
+      if (!reasons.has(ruleId)) {
+        reasons.set(ruleId, preset.label);
+      }
+    }
+  }
+
+  return Array.from(reasons.entries()).map(([ruleId, label]) => ({
+    scope: "rule",
+    ruleId,
+    reason: `일반 룰 제외: ${label}`
+  }));
+}
 
 type UploadPanelProps = {
   onAnalysisComplete?: () => void;
@@ -67,6 +150,8 @@ export function UploadPanel({ onAnalysisComplete }: UploadPanelProps) {
   const [analysisPhase, setAnalysisPhase] = useState<"idle" | "running" | "complete">("idle");
   const [showCompletionNotice, setShowCompletionNotice] = useState(false);
   const [selectionAudit, setSelectionAudit] = useState<SelectionAudit | null>(null);
+  const [enabledExclusionPresets, setEnabledExclusionPresets] = useState<string[]>([]);
+  const [isExclusionMenuOpen, setIsExclusionMenuOpen] = useState(false);
   const mutation = useAnalysisMutation();
   const {
     inputMode,
@@ -94,6 +179,8 @@ export function UploadPanel({ onAnalysisComplete }: UploadPanelProps) {
   const mutationMessage = mutation.error instanceof Error ? mutation.error.message : "";
   const feedbackMessage = localMessage || mutationMessage;
   const feedbackIsError = Boolean(mutationMessage && !localMessage);
+  const selectedSuppressions = buildRuleSuppressions(enabledExclusionPresets);
+  const excludedRuleCount = selectedSuppressions.length;
 
   const clearAnalysisFeedback = () => {
     mutation.reset();
@@ -108,6 +195,14 @@ export function UploadPanel({ onAnalysisComplete }: UploadPanelProps) {
       setSelectionAudit(null);
     }
     setInputMode(mode);
+  };
+
+  const toggleExclusionPreset = (presetId: string) => {
+    setEnabledExclusionPresets((current) =>
+      current.includes(presetId)
+        ? current.filter((id) => id !== presetId)
+        : [...current, presetId]
+    );
   };
 
   const runAnalysis = () => {
@@ -130,7 +225,8 @@ export function UploadPanel({ onAnalysisComplete }: UploadPanelProps) {
     const feedbackStartedAt = Date.now();
     mutation.mutate({
       projectName: projectName.trim() || "취약했네 프로젝트",
-      files
+      files,
+      suppressions: selectedSuppressions
     }, {
       onSuccess: () => {
         const remainingFeedbackMs = Math.max(MIN_ANALYSIS_FEEDBACK_MS - (Date.now() - feedbackStartedAt), 0);
@@ -354,6 +450,7 @@ export function UploadPanel({ onAnalysisComplete }: UploadPanelProps) {
               <SummaryRow label="방식" value={selectedMode.label} />
               <SummaryRow label="파일" value={`${selectedFileCount}개`} />
               <SummaryRow label="라인" value={`${selectedLineCount}줄`} />
+              <SummaryRow label="일반 룰" value={excludedRuleCount > 0 ? `${excludedRuleCount}개 제외` : "제외 없음"} />
               {pastedCodeMeta && <SummaryRow label="언어" value={pastedCodeLanguage === "auto" ? `${pastedCodeMeta.language} · 자동` : `${pastedCodeMeta.language} · 수동`} />}
             </dl>
           </div>
@@ -380,6 +477,15 @@ export function UploadPanel({ onAnalysisComplete }: UploadPanelProps) {
         </aside>
 
         <div className="p-4 lg:p-5">
+          <RuleExclusionPanel
+            presets={ruleExclusionPresets}
+            selectedIds={enabledExclusionPresets}
+            excludedRuleCount={excludedRuleCount}
+            open={isExclusionMenuOpen}
+            onOpenChange={setIsExclusionMenuOpen}
+            onToggle={toggleExclusionPreset}
+          />
+
           <div
             onDragOver={(event) => {
               event.preventDefault();
@@ -449,7 +555,7 @@ export function UploadPanel({ onAnalysisComplete }: UploadPanelProps) {
               <PickerState
                 icon={Archive}
                 title="ZIP 아카이브"
-                meta=".zip"
+                meta=".zip · 코드/설정 최대 10,000개"
                 buttonLabel="ZIP 선택"
                 onClick={() => zipInputRef.current?.click()}
               />
@@ -459,7 +565,7 @@ export function UploadPanel({ onAnalysisComplete }: UploadPanelProps) {
               <PickerState
                 icon={FolderOpen}
                 title="프로젝트 폴더"
-                meta="directory"
+                meta="소스 기준 최대 10,000개"
                 buttonLabel="폴더 선택"
                 onClick={() => folderInputRef.current?.click()}
               />
@@ -539,6 +645,89 @@ export function UploadPanel({ onAnalysisComplete }: UploadPanelProps) {
         </div>
       </div>
     </section>
+  );
+}
+
+function RuleExclusionPanel({
+  presets,
+  selectedIds,
+  excludedRuleCount,
+  open,
+  onOpenChange,
+  onToggle
+}: {
+  presets: RuleExclusionPreset[];
+  selectedIds: string[];
+  excludedRuleCount: number;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onToggle: (presetId: string) => void;
+}) {
+  const selectedPresets = presets.filter((preset) => selectedIds.includes(preset.id));
+  const summary = selectedPresets.length > 0
+    ? selectedPresets.map((preset) => preset.label).join(", ")
+    : "제외 없음";
+
+  return (
+    <div className="relative z-30 mb-3">
+      <div className="grid gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 shadow-panel sm:min-h-11 sm:grid-cols-[150px_minmax(0,1fr)] sm:items-center">
+        <div className="flex min-w-0 items-center gap-2">
+          <span className="inline-flex items-center gap-1.5 text-xs font-black uppercase text-slate-500">
+            <SlidersHorizontal size={14} className="text-slate-700" />
+            일반 룰 제외
+          </span>
+        </div>
+        <button
+          type="button"
+          onClick={() => onOpenChange(!open)}
+          aria-expanded={open}
+          className={`grid h-10 w-full min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-3 rounded-md border px-3 text-sm font-black transition ${
+          excludedRuleCount > 0
+            ? "border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100"
+            : "border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100"
+        }`}
+        >
+          <span className="min-w-0 truncate text-left">{summary}</span>
+          <span className="inline-flex items-center gap-1.5">
+            {excludedRuleCount > 0 ? `${excludedRuleCount}개 제외` : "선택"}
+            <ChevronDown size={14} className={`transition-transform ${open ? "rotate-180" : ""}`} />
+          </span>
+        </button>
+      </div>
+
+      {open && (
+        <div className="absolute left-0 right-0 top-[calc(100%+8px)] z-40 rounded-lg border border-slate-200 bg-white p-2 shadow-soft">
+          <div className="grid gap-1 sm:grid-cols-2">
+            {presets.map((preset) => {
+              const checked = selectedIds.includes(preset.id);
+              return (
+                <label
+                  key={preset.id}
+                  className={`flex cursor-pointer gap-2 rounded-md px-3 py-2.5 transition ${
+                    checked
+                      ? "bg-blue-50 text-blue-950"
+                      : "text-slate-700 hover:bg-slate-50"
+                  }`}
+                >
+                  <input
+                    type="checkbox"
+                    checked={checked}
+                    onChange={() => onToggle(preset.id)}
+                    className="mt-0.5 h-4 w-4 shrink-0 accent-blue-600"
+                  />
+                  <span className="min-w-0">
+                    <span className="block text-sm font-black">{preset.label}</span>
+                    <span className={`mt-0.5 block text-xs font-semibold leading-5 ${checked ? "text-blue-800" : "text-slate-500"}`}>
+                      {preset.description}
+                    </span>
+                  </span>
+                </label>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
 

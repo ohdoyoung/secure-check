@@ -63,8 +63,10 @@ final class RuleSupport {
             String recommendation,
             String fixedExample
     ) {
+        String ruleId = builtInRuleId(title);
         return new Finding(
-                id(file.path(), title, lineNumber),
+                id(file.path(), ruleId, lineNumber),
+                ruleId,
                 severity,
                 category,
                 title,
@@ -74,7 +76,11 @@ final class RuleSupport {
                 lineContext(file, lineNumber),
                 description,
                 recommendation,
-                fixedExample
+                fixedExample,
+                null,
+                "Regex",
+                null,
+                null
         );
     }
 
@@ -122,6 +128,24 @@ final class RuleSupport {
         } catch (NoSuchAlgorithmException exception) {
             return path + ":" + lineNumber + ":" + title;
         }
+    }
+
+    private static String builtInRuleId(String title) {
+        return switch (title) {
+            case "인증/인가 누락 의심" -> "BUILTIN_AUTHZ_MISSING_001";
+            case "Command Injection 의심" -> "BUILTIN_CMDI_001";
+            case "위험 API 사용" -> "BUILTIN_DANGEROUS_API_001";
+            case "Deprecated 함수/구조 사용" -> "BUILTIN_DEPRECATED_API_001";
+            case "디버그 코드 잔존" -> "BUILTIN_DEBUG_CODE_001";
+            case "예외처리 부족" -> "BUILTIN_EXCEPTION_HANDLING_001";
+            case "파일 업로드 검증 부족" -> "BUILTIN_FILE_UPLOAD_001";
+            case "JWT 검증 누락" -> "BUILTIN_JWT_VALIDATION_001";
+            case "하드코딩된 비밀번호/키" -> "BUILTIN_SECRET_KEY_001";
+            case "민감정보 로그 출력" -> "BUILTIN_SENSITIVE_LOG_001";
+            case "SQL Injection 의심" -> "BUILTIN_SQLI_001";
+            case "XSS 가능성" -> "BUILTIN_XSS_001";
+            default -> "BUILTIN_" + title.replaceAll("[^A-Za-z0-9]+", "_").replaceAll("^_+|_+$", "").toUpperCase() + "_001";
+        };
     }
 
     private static String lineContext(CodeFile file, int lineNumber) {

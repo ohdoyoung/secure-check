@@ -4,6 +4,7 @@ import com.chwiyakhaenne.model.AnalysisResult;
 import com.chwiyakhaenne.model.AnalyzerStatus;
 import com.chwiyakhaenne.model.FileRiskSummary;
 import com.chwiyakhaenne.model.Finding;
+import com.chwiyakhaenne.model.ScoreBreakdown;
 import org.springframework.stereotype.Component;
 import org.springframework.web.util.HtmlUtils;
 
@@ -27,10 +28,7 @@ public class HtmlReportGenerator {
         String analyzerStatuses = result.analyzerStatuses().stream()
                 .map(this::analyzerStatusSection)
                 .reduce("", String::concat);
-        int highPenalty = result.severityCount().high() * 12;
-        int mediumPenalty = result.severityCount().medium() * 6;
-        int lowPenalty = result.severityCount().low() * 2;
-        int totalPenalty = highPenalty + mediumPenalty + lowPenalty;
+        ScoreBreakdown scoreBreakdown = result.scoreBreakdown();
 
         return """
                 <!doctype html>
@@ -91,10 +89,12 @@ public class HtmlReportGenerator {
                     <div class="card"><div class="label">MEDIUM</div><div class="value MEDIUM">%d</div></div>
                     <div class="card"><div class="label">LOW</div><div class="value LOW">%d</div></div>
                     <div class="card"><div class="label">총 취약점</div><div class="value">%d</div></div>
+                    <div class="card"><div class="label">억제됨</div><div class="value">%d</div></div>
                   </section>
                   <h2>권장 조치</h2>
                   <p>HIGH 항목부터 우선 수정하고, 인증/인가와 입력값 검증 흐름을 프로젝트 공통 규칙으로 정리하세요.</p>
                   <h2>점수 산정</h2>
+                  <p class="muted">HIGH/MEDIUM/LOW별 상한을 둔 비선형 누적 감점 방식으로 산정합니다.</p>
                   <section class="summary">
                     <div class="card"><div class="label">HIGH 감점</div><div class="value HIGH">-%d</div></div>
                     <div class="card"><div class="label">MEDIUM 감점</div><div class="value MEDIUM">-%d</div></div>
@@ -124,10 +124,11 @@ public class HtmlReportGenerator {
                 result.severityCount().medium(),
                 result.severityCount().low(),
                 result.severityCount().total(),
-                highPenalty,
-                mediumPenalty,
-                lowPenalty,
-                Math.min(totalPenalty, 100),
+                result.suppressedFindingCount(),
+                scoreBreakdown.highPenalty(),
+                scoreBreakdown.mediumPenalty(),
+                scoreBreakdown.lowPenalty(),
+                scoreBreakdown.totalPenalty(),
                 priorityFindings.isBlank() ? "<p class=\"muted\">우선 수정 항목이 없습니다.</p>" : priorityFindings,
                 topRiskFiles.isBlank() ? "<p class=\"muted\">위험 파일이 없습니다.</p>" : topRiskFiles,
                 analyzerStatuses.isBlank() ? "<p class=\"muted\">등록된 외부 분석기가 없습니다.</p>" : analyzerStatuses,

@@ -5,6 +5,7 @@ import com.chwiyakhaenne.model.AnalyzerStatus;
 import com.chwiyakhaenne.model.FileRiskSummary;
 import com.chwiyakhaenne.model.Finding;
 import com.chwiyakhaenne.model.ProjectTreeNode;
+import com.chwiyakhaenne.model.ScoreBreakdown;
 import com.chwiyakhaenne.model.Severity;
 import com.chwiyakhaenne.model.SeverityCount;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -44,13 +45,15 @@ class SarifReportGeneratorTest {
         AnalysisResult result = new AnalysisResult(
                 "ci-project",
                 OffsetDateTime.parse("2026-07-06T09:00:00+09:00"),
-                88,
-                "관리 필요",
+                93,
+                "건강함",
                 SeverityCount.of(1, 0, 0),
+                new ScoreBreakdown(7, 0, 0, 7),
                 List.of(finding),
                 List.of(new FileRiskSummary("src/app.js", SeverityCount.of(1, 0, 0), 1, 100)),
                 List.of(new FileRiskSummary("src/app.js", SeverityCount.of(1, 0, 0), 1, 100)),
                 new ProjectTreeNode("project", "", "directory"),
+                3,
                 List.of(new AnalyzerStatus("Semgrep", false, false, 0, "테스트 비활성")),
                 "",
                 ""
@@ -70,5 +73,7 @@ class SarifReportGeneratorTest {
                 .isEqualTo(12);
         assertThat(sarifResult.path("properties").path("recommendation").asText()).contains("파라미터");
         assertThat(sarifResult.path("partialFingerprints").path("primaryLocationLineHash").asText()).isNotBlank();
+        assertThat(run.path("properties").path("totalPenalty").asInt()).isEqualTo(7);
+        assertThat(run.path("properties").path("suppressedFindingCount").asInt()).isEqualTo(3);
     }
 }

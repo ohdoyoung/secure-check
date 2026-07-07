@@ -1,9 +1,11 @@
 import JSZip from "jszip";
 import type { CodeFile, PastedCodeLanguageOption } from "../types/analysis";
 
-const MAX_BROWSER_UPLOAD_FILES = 2000;
+const MAX_BROWSER_UPLOAD_FILES = 10_000;
 const MAX_BROWSER_FILE_BYTES = 2 * 1024 * 1024;
-const MAX_BROWSER_TOTAL_BYTES = 20 * 1024 * 1024;
+const MAX_BROWSER_TOTAL_BYTES = 80 * 1024 * 1024;
+const LOCAL_FILE_READ_CONCURRENCY = 24;
+const ZIP_ENTRY_READ_CONCURRENCY = 16;
 
 const SUPPORTED_EXTENSIONS = [
   ".java",
@@ -60,6 +62,17 @@ const IGNORED_PATH_PARTS = new Set([
   ".nuxt",
   "coverage",
   ".gradle",
+  "vendor",
+  "venv",
+  ".venv",
+  "__pycache__",
+  ".mypy_cache",
+  ".pytest_cache",
+  ".cache",
+  ".turbo",
+  ".parcel-cache",
+  ".yarn",
+  ".pnpm-store",
   ".idea",
   ".vscode"
 ]);
@@ -179,9 +192,13 @@ function toUserFacingSize(bytes: number) {
   return `${Math.round(bytes / (1024 * 1024))}MB`;
 }
 
+function toUserFacingCount(count: number) {
+  return count.toLocaleString("ko-KR");
+}
+
 export function ensureBrowserUploadCapacity(fileCount: number, nextBytes: number, totalBytes: number) {
   if (fileCount > MAX_BROWSER_UPLOAD_FILES) {
-    throw new Error(`브라우저에서는 한 번에 최대 ${MAX_BROWSER_UPLOAD_FILES}개 파일까지만 읽을 수 있습니다.`);
+    throw new Error(`분석 대상 파일은 한 번에 최대 ${toUserFacingCount(MAX_BROWSER_UPLOAD_FILES)}개까지 읽을 수 있습니다.`);
   }
   if (nextBytes > MAX_BROWSER_FILE_BYTES) {
     throw new Error(`단일 파일은 최대 ${toUserFacingSize(MAX_BROWSER_FILE_BYTES)}까지만 읽을 수 있습니다.`);
@@ -191,27 +208,47 @@ export function ensureBrowserUploadCapacity(fileCount: number, nextBytes: number
   }
 }
 
+function ensureBrowserCandidateCount(fileCount: number) {
+  if (fileCount > MAX_BROWSER_UPLOAD_FILES) {
+    throw new Error(`분석 대상 후보가 ${toUserFacingCount(fileCount)}개입니다. 최대 ${toUserFacingCount(MAX_BROWSER_UPLOAD_FILES)}개까지 지원하므로 src/backend/frontend 같은 실제 소스 폴더만 선택해 주세요.`);
+  }
+}
+
+async function mapWithConcurrency<T, R>(items: T[], limit: number, mapper: (item: T, index: number) => Promise<R>) {
+  const results: R[] = new Array(items.length);
+  let nextIndex = 0;
+
+  async function worker() {
+    while (nextIndex < items.length) {
+      const currentIndex = nextIndex;
+      nextIndex += 1;
+      results[currentIndex] = await mapper(items[currentIndex], currentIndex);
+    }
+  }
+
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
+  return results;
+}
+
 export async function readTextFiles(fileList: FileList | File[]) {
   const files = Array.from(fileList);
+  const supportedFiles = files.filter((file) => isSupportedFile(file.webkitRelativePath || file.name));
+  ensureBrowserCandidateCount(supportedFiles.length);
   let acceptedCount = 0;
   let acceptedBytes = 0;
-  const codeFilesWithEmpty = await Promise.all(
-    files
-      .filter((file) => isSupportedFile(file.webkitRelativePath || file.name))
-      .map(async (file): Promise<CodeFile | null> => {
-        const path = file.webkitRelativePath || file.name;
-        const content = await file.text();
-        if (!content.trim()) return null;
-        acceptedCount += 1;
-        acceptedBytes += file.size;
-        ensureBrowserUploadCapacity(acceptedCount, file.size, acceptedBytes);
-        return {
-          path,
-          language: detectLanguage(path),
-          content
-        } satisfies CodeFile;
-      })
-  );
+  const codeFilesWithEmpty = await mapWithConcurrency(supportedFiles, LOCAL_FILE_READ_CONCURRENCY, async (file): Promise<CodeFile | null> => {
+    const path = file.webkitRelativePath || file.name;
+    const content = await file.text();
+    if (!content.trim()) return null;
+    acceptedCount += 1;
+    acceptedBytes += file.size;
+    ensureBrowserUploadCapacity(acceptedCount, file.size, acceptedBytes);
+    return {
+      path,
+      language: detectLanguage(path),
+      content
+    } satisfies CodeFile;
+  });
   const codeFiles = codeFilesWithEmpty.filter((file): file is CodeFile => file !== null);
   return codeFiles;
 }
@@ -264,23 +301,22 @@ export async function readZipBlobWithStats(blob: Blob, options?: ZipReadOptions)
     }))
     .filter((item): item is { entry: JSZip.JSZipObject; normalizedName: string } => item.normalizedName !== null && item.normalizedName !== "");
   const entries = normalizedEntries.filter(({ normalizedName }) => isSupportedFile(normalizedName));
+  ensureBrowserCandidateCount(entries.length);
   let acceptedCount = 0;
   let acceptedBytes = 0;
-  const codeFilesWithEmpty = await Promise.all(
-    entries.map(async ({ entry, normalizedName }): Promise<CodeFile | null> => {
-      const contentBlob = await entry.async("blob");
-      const content = await contentBlob.text();
-      if (!content.trim()) return null;
-      acceptedCount += 1;
-      acceptedBytes += contentBlob.size;
-      ensureBrowserUploadCapacity(acceptedCount, contentBlob.size, acceptedBytes);
-      return {
-        path: normalizedName,
-        language: detectLanguage(normalizedName),
-        content
-      };
-    })
-  );
+  const codeFilesWithEmpty = await mapWithConcurrency(entries, ZIP_ENTRY_READ_CONCURRENCY, async ({ entry, normalizedName }): Promise<CodeFile | null> => {
+    const contentBlob = await entry.async("blob");
+    const content = await contentBlob.text();
+    if (!content.trim()) return null;
+    acceptedCount += 1;
+    acceptedBytes += contentBlob.size;
+    ensureBrowserUploadCapacity(acceptedCount, contentBlob.size, acceptedBytes);
+    return {
+      path: normalizedName,
+      language: detectLanguage(normalizedName),
+      content
+    };
+  });
   const codeFiles = codeFilesWithEmpty.filter((file): file is CodeFile => file !== null);
   return {
     files: codeFiles,
@@ -302,12 +338,17 @@ type BrowserFileEntry = {
 };
 
 async function entryToFiles(entry: BrowserFileEntry, parentPath = ""): Promise<File[]> {
+  const path = `${parentPath}${entry.name}`;
+  if (isIgnoredPath(path)) {
+    return [];
+  }
+
   if (entry.isFile) {
     return new Promise((resolve, reject) => {
       entry.file(
         (file) => {
           Object.defineProperty(file, "webkitRelativePath", {
-            value: `${parentPath}${file.name}`,
+            value: path,
             configurable: true
           });
           resolve([file]);
@@ -334,7 +375,7 @@ async function entryToFiles(entry: BrowserFileEntry, parentPath = ""): Promise<F
   }
 
   await readBatch();
-  const nestedFiles = await Promise.all(entries.map((child) => entryToFiles(child, `${parentPath}${entry.name}/`)));
+  const nestedFiles = await mapWithConcurrency(entries, LOCAL_FILE_READ_CONCURRENCY, (child) => entryToFiles(child, `${path}/`));
   return nestedFiles.flat();
 }
 

@@ -54,6 +54,11 @@ public class SarifReportGenerator {
         properties.put("medium", result.severityCount().medium());
         properties.put("low", result.severityCount().low());
         properties.put("total", result.severityCount().total());
+        properties.put("highPenalty", result.scoreBreakdown().highPenalty());
+        properties.put("mediumPenalty", result.scoreBreakdown().mediumPenalty());
+        properties.put("lowPenalty", result.scoreBreakdown().lowPenalty());
+        properties.put("totalPenalty", result.scoreBreakdown().totalPenalty());
+        properties.put("suppressedFindingCount", result.suppressedFindingCount());
         run.set("properties", properties);
 
         root.set("runs", objectMapper.createArrayNode().add(run));

@@ -32,7 +32,7 @@ export function ScoreGauge({ score, verdict }: ScoreGaugeProps) {
 
       <div className="mt-6 flex items-center gap-3 rounded-md border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-600">
         <Activity size={16} className="shrink-0 text-slate-500" />
-        HIGH는 12점, MEDIUM은 6점, LOW는 2점씩 감점됩니다.
+        심각도별 상한을 둔 누적 곡선으로 감점됩니다.
       </div>
     </section>
   );
